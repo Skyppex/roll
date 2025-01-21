@@ -21,5 +21,9 @@ pub struct Cli {
     /// Errors will still be printed to stderr.
     #[arg(short, long)]
     pub quiet: bool,
-}
 
+    /// The expression to evaluate.
+    /// If not provided, read from source or stdin.
+    #[arg(last = true)]
+    pub expression: Vec<String>,
+}

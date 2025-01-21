@@ -37,6 +37,11 @@ you can also do this to roll dice:
   - this rolls a die which has sides ranging from {min} to {max} (its inclusive)
 - {rolls}d[{side1}, {side2}, {side3}]
   - this rolls a die with the specified values for its sides
+- {rolls}df
+  - this rolls a fudge die which has the sides: [-, -, o, o, +, +]
+  - a '-' is a failure (equals -1)
+  - a '+' is a success (equals 1)
+  - a 'o' is neutral (equals 0)
 
 a roll expression is built using a queue.
 first the dice rolls are added to the queue and then all modifiers are enqueued
@@ -58,12 +63,12 @@ removing rolls from the pool of existing rolls, or rerolling them.
 - **(d|dl){integer}**: drop the {integer} lowest rolls
 - **dh{integer}**: drop the {integer} highest rolls
 - **!{integer}**: roll another die for each die in the pool which rolled its max \
-value and keep doing so to the new dice being added until a maximum of {integer} dice have been added
+  value and keep doing so to the new dice being added until a maximum of {integer} dice have been added
   - logic can be altered with a condition
   - when a die explodes, the extra roll is added to the existing value and they
     are considered the same roll for modifiers such as `k`
 - **r{integer}**: reroll each die in the pool which rolled its min value and \
-keep doing so to the rerolled dice until the die has been rerolled a maximum of {integer} times
+  keep doing so to the rerolled dice until the die has been rerolled a maximum of {integer} times
   - logic can be altered with a condition
 
 ###### conditions
@@ -100,3 +105,15 @@ conditions can be applied to some modifiers to change when they trigger
 - **r2**: reroll results equal to one up to 2 times each
 - **!3**: explode each die up to 3 times
 - **k2**: keep 2 highest rolls in the pool
+
+## expression notation
+
+a flag should be available which displays each roll and what happened to it.
+this display follows the following rules:
+
+- **dice roll**: 2d4 = [1, 1] - 2
+- **fudge roll**: 4df = [-, o, +, +] - 1
+- **kept rolls**: 2d4k = [4, 1d] - 4
+- **dropped rolls**: 2d4d = [4, 1d] - 4
+- **exploded rolls**: 2d4! = [(1!, 1), (1!, 1)] - 4
+- **rerolls**: 2d4r = [(1r, 1), (1r, 1)] - 2

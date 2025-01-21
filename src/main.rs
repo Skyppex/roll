@@ -1,7 +1,9 @@
 mod cli;
 mod io_utils;
+mod parser;
 mod path_utils;
 mod program;
+mod tokenizer;
 
 use std::io::Result;
 
