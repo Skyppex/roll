@@ -1,9 +1,11 @@
 use std::io::{Read, Write};
 
-use crate::args::Args;
+use crate::cli::Cli;
 
-pub fn run<R: Read, W: Write>(reader: R, mut writer: W, args: Args) {
-    todo!("Write the program logic here");
+pub fn run<R: Read, W: Write>(reader: R, mut writer: W, cli: Cli) {
+    // tokenize expression
+
+    //
 }
 
 #[cfg(test)]
