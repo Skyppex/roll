@@ -1,6 +1,6 @@
-use std::error::Error;
+use std::{error::Error, fmt::Display};
 
-use crate::tokenizer::Token;
+use crate::{evaluator::eval, tokenizer::Token};
 
 pub fn parse(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
     tokens.reverse(); // reverse so we can pop from the end
@@ -86,17 +86,24 @@ fn parse_multiplicative(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>>
 }
 
 fn parse_roll(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
-    let rolls = parse_primary(tokens)?;
+    let rolls = if tokens.clone().pop() != Some(Token::D) {
+        Some(parse_primary(tokens)?)
+    } else {
+        None
+    };
 
-    if let Expr::Float(_) = rolls {
-        return Err("Expected integer value for number of rolls".into());
-    }
-
-    if tokens.clone().pop() != Some(Token::D) {
-        return Ok(rolls);
-    }
-
-    tokens.pop(); // pop the 'd'
+    let rolls = match (rolls, tokens.clone().pop()) {
+        (Some(Expr::Float(v)), _) => return Ok(Expr::Float(v)),
+        (Some(t), Some(Token::D)) => {
+            tokens.pop();
+            t
+        }
+        (Some(t), _) => return Ok(t),
+        (None, _) => {
+            tokens.pop();
+            Expr::Int(1)
+        }
+    };
 
     let sides = parse_sides(tokens)?;
 
@@ -167,8 +174,6 @@ fn parse_sides(tokens: &mut Vec<Token>) -> Result<Sides, Box<dyn Error>> {
 }
 
 fn parse_primary(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
-    // int, float, parenthesized expr
-
     match tokens.pop() {
         Some(Token::Int(value)) => Ok(Expr::Int(value)),
         Some(Token::Float(value)) => Ok(Expr::Float(value)),
@@ -214,10 +219,45 @@ pub enum BinOp {
     Mod,
 }
 
+impl Display for BinOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let string_representation = match self {
+            BinOp::Add => "+",
+            BinOp::Sub => "-",
+            BinOp::Mul => "*",
+            BinOp::Div => "/",
+            BinOp::Mod => "%",
+        };
+
+        write!(f, "{string_representation}")
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Sides {
     Expr(Box<Expr>),
     Range { min: Box<Expr>, max: Box<Expr> },
     Values(Vec<Expr>),
     Fudge,
+}
+
+impl Sides {
+    pub fn explain(&self) -> String {
+        match self {
+            Sides::Expr(expr) => eval(expr).unwrap().explanation,
+            Sides::Range { min, max } => format!(
+                "{}..{}",
+                eval(min).unwrap().explanation,
+                eval(max).unwrap().explanation
+            ),
+            Sides::Values(values) => {
+                let values = values
+                    .iter()
+                    .map(|v| eval(v).unwrap().explanation)
+                    .collect::<Vec<_>>();
+                values.join(", ")
+            }
+            Sides::Fudge => "f".to_string(),
+        }
+    }
 }

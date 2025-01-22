@@ -22,8 +22,28 @@ pub struct Cli {
     #[arg(short, long)]
     pub quiet: bool,
 
+    #[arg(short = 'n', long)]
+    pub amount: Option<i32>,
+
+    #[arg(short, long)]
+    pub explain: bool,
+
     /// The expression to evaluate.
     /// If not provided, read from source or stdin.
     #[arg(last = true)]
     pub expression: Vec<String>,
+}
+
+impl Cli {
+    pub fn verbose<T, F: Fn() -> T>(&self, f: F) {
+        if self.verbose {
+            _ = f();
+        }
+    }
+
+    pub fn quiet<T, F: Fn() -> T>(&self, f: F) {
+        if !self.quiet {
+            _ = f();
+        }
+    }
 }

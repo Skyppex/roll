@@ -3,7 +3,12 @@ use std::{
     io::{Read, Write},
 };
 
-use crate::{cli::Cli, parser::parse, tokenizer::tokenize};
+use crate::{
+    cli::Cli,
+    evaluator::{eval, DiceRollResult},
+    parser::parse,
+    tokenizer::tokenize,
+};
 
 pub fn run<R: Read, W: Write>(
     mut reader: R,
@@ -21,14 +26,32 @@ pub fn run<R: Read, W: Write>(
         reader.read_to_string(&mut buf)?;
     }
 
-    let mut tokens = tokenize(&buf);
-    dbg!(&tokens);
+    let mut tokens = tokenize(&buf)?;
+
+    cli.verbose(|| dbg!(&tokens));
 
     // parse tokens
-    let tree = parse(&mut tokens);
-    dbg!(&tree);
+    let tree = parse(&mut tokens)?;
+    cli.verbose(|| dbg!(&tree));
+    cli.verbose(|| eprintln!());
+
+    for _ in 0..cli.amount.unwrap_or(1) - 1 {
+        let result = eval(&tree)?;
+        writeln!(writer, "{}", format_result(result, &cli))?;
+    }
+
+    let result = eval(&tree)?;
+    write!(writer, "{}", format_result(result, &cli))?;
 
     Ok(())
+}
+
+fn format_result(result: DiceRollResult, cli: &Cli) -> String {
+    if cli.explain {
+        format!("{} : {}", result.result, result.explanation)
+    } else {
+        format!("{}", result.result)
+    }
 }
 
 #[cfg(test)]

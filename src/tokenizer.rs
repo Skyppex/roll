@@ -1,4 +1,4 @@
-pub fn tokenize(expression: &str) -> Vec<Token> {
+pub fn tokenize(expression: &str) -> Result<Vec<Token>, Box<dyn std::error::Error>> {
     let mut tokens = Vec::new();
     let mut chars = expression.chars().peekable();
 
@@ -30,7 +30,12 @@ pub fn tokenize(expression: &str) -> Vec<Token> {
                     value.push(chars.next().unwrap());
                 }
 
-                if let Some('.') = chars.peek() {
+                let mut clone = chars.clone();
+                let first = clone.next();
+                let second = clone.next();
+
+                #[allow(clippy::almost_complete_range)]
+                if let (Some('.'), Some('0'..'9')) = (first, second) {
                     value.push(chars.next().unwrap());
 
                     while let Some('0'..='9') = chars.peek() {
@@ -42,10 +47,11 @@ pub fn tokenize(expression: &str) -> Vec<Token> {
                     tokens.push(Token::Int(value.parse().unwrap()));
                 }
             }
-            _ => panic!("Invalid character: {}", c),
+            _ => Err(format!("Unexpected character: {}", c))?,
         }
     }
-    tokens
+
+    Ok(tokens)
 }
 
 #[derive(Debug, Clone, PartialEq)]

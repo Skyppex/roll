@@ -117,3 +117,6 @@ this display follows the following rules:
 - **dropped rolls**: 2d4d = [4, 1d] - 4
 - **exploded rolls**: 2d4! = [(1!, 1), (1!, 1)] - 4
 - **rerolls**: 2d4r = [(1r, 1), (1r, 1)] - 2
+
+- 1d[1d[1..3], 1d[4..6]] = [1d[2, 4]: 4]
+- 2d(1d4) = [1d3: 3, 1d1: 1]
