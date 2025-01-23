@@ -29,8 +29,8 @@ pub fn eval(tree: &Expr) -> Result<EvalResult, Box<dyn std::error::Error>> {
         Expr::Roll {
             rolls,
             sides,
-            modifier,
-        } => eval_roll(rolls, sides, modifier),
+            modifiers,
+        } => eval_roll(rolls, sides, modifiers),
     }
 }
 
@@ -94,7 +94,7 @@ fn eval_multiplicative(
 fn eval_roll(
     rolls: &Expr,
     sides: &Sides,
-    modifier: &Option<Modifier>,
+    modifiers: &Vec<Modifier>,
 ) -> Result<EvalResult, Box<dyn std::error::Error>> {
     let EvalResult {
         result,
@@ -190,132 +190,133 @@ fn eval_roll(
         results.push(DiceRolls::new(side_values[index], side_values.clone()));
     }
 
-    match modifier {
-        Some(Modifier::KeepHighest(expr)) => {
-            let EvalResult { result, .. } = eval(expr)?;
+    for modifier in modifiers {
+        match modifier {
+            Modifier::KeepHighest(expr) => {
+                let EvalResult { result, .. } = eval(expr)?;
 
-            let value = result.round() as i64;
+                let value = result.round() as i64;
 
-            if value < 0 {
-                return Err("Cannot keep a negative number of dice".into());
+                if value < 0 {
+                    return Err("Cannot keep a negative number of dice".into());
+                }
+
+                if value > rolls {
+                    return Err("Cannot keep more dice than rolled".into());
+                }
+
+                results.sort_by_key(|a| a.sum());
+
+                for i in 0..(results.len() - value as usize) {
+                    results[i].drop();
+                }
+
+                results.reverse();
             }
+            Modifier::KeepLowest(expr) => {
+                let EvalResult { result, .. } = eval(expr)?;
 
-            if value > rolls {
-                return Err("Cannot keep more dice than rolled".into());
+                let value = result.round() as i64;
+
+                if value < 0 {
+                    return Err("Cannot keep a negative number of dice".into());
+                }
+
+                if value > rolls {
+                    return Err("Cannot keep more dice than rolled".into());
+                }
+
+                results.sort_by_key(|b| std::cmp::Reverse(b.sum()));
+
+                for i in 0..(results.len() - value as usize) {
+                    results[i].drop()
+                }
             }
+            Modifier::DropLowest(expr) => {
+                let EvalResult { result, .. } = eval(expr)?;
 
-            results.sort_by_key(|a| a.sum());
+                let value = result.round() as i64;
 
-            for i in 0..(results.len() - value as usize) {
-                results[i].drop();
+                if value < 0 {
+                    return Err("Cannot drop a negative number of dice".into());
+                }
+
+                if value > rolls {
+                    return Err("Cannot drop more dice than rolled".into());
+                }
+
+                results.sort_by_key(|a| a.sum());
+
+                (0..value as usize).for_each(|i| results[i].drop());
+
+                results.reverse();
             }
+            Modifier::DropHighest(expr) => {
+                let EvalResult { result, .. } = eval(expr)?;
 
-            results.reverse();
-        }
-        Some(Modifier::KeepLowest(expr)) => {
-            let EvalResult { result, .. } = eval(expr)?;
+                let value = result.round() as i64;
 
-            let value = result.round() as i64;
+                if value < 0 {
+                    return Err("Cannot drop a negative number of dice".into());
+                }
 
-            if value < 0 {
-                return Err("Cannot keep a negative number of dice".into());
+                if value > rolls {
+                    return Err("Cannot drop more dice than rolled".into());
+                }
+
+                results.sort_by_key(|b| std::cmp::Reverse(b.sum()));
+
+                (0..value as usize).for_each(|i| results[i].drop());
             }
+            Modifier::Reroll(expr) => {
+                let EvalResult { result, .. } = eval(expr)?;
 
-            if value > rolls {
-                return Err("Cannot keep more dice than rolled".into());
-            }
+                let value = result.round() as i64;
 
-            results.sort_by_key(|b| std::cmp::Reverse(b.sum()));
+                if value < 0 {
+                    return Err("Cannot reroll a negative number of times".into());
+                }
 
-            for i in 0..(results.len() - value as usize) {
-                results[i].drop()
-            }
-        }
-        Some(Modifier::DropLowest(expr)) => {
-            let EvalResult { result, .. } = eval(expr)?;
+                for result in results.iter_mut() {
+                    for _ in 0..value {
+                        if result.sum() == result.min_side() {
+                            let len = side_values.len();
 
-            let value = result.round() as i64;
+                            if len == 0 {
+                                continue;
+                            }
 
-            if value < 0 {
-                return Err("Cannot drop a negative number of dice".into());
-            }
-
-            if value > rolls {
-                return Err("Cannot drop more dice than rolled".into());
-            }
-
-            results.sort_by_key(|a| a.sum());
-
-            (0..value as usize).for_each(|i| results[i].drop());
-
-            results.reverse();
-        }
-        Some(Modifier::DropHighest(expr)) => {
-            let EvalResult { result, .. } = eval(expr)?;
-
-            let value = result.round() as i64;
-
-            if value < 0 {
-                return Err("Cannot drop a negative number of dice".into());
-            }
-
-            if value > rolls {
-                return Err("Cannot drop more dice than rolled".into());
-            }
-
-            results.sort_by_key(|b| std::cmp::Reverse(b.sum()));
-
-            (0..value as usize).for_each(|i| results[i].drop());
-        }
-        Some(Modifier::Reroll(expr)) => {
-            let EvalResult { result, .. } = eval(expr)?;
-
-            let value = result.round() as i64;
-
-            if value < 0 {
-                return Err("Cannot reroll a negative number of times".into());
-            }
-
-            for result in results.iter_mut() {
-                for _ in 0..value {
-                    if result.sum() == result.min_side() {
-                        let len = side_values.len();
-
-                        if len == 0 {
-                            continue;
+                            let index = rng.gen_range(0..len);
+                            result.reroll(side_values[index]);
                         }
+                    }
+                }
+            }
+            Modifier::Explode(expr) => {
+                let EvalResult { result, .. } = eval(expr)?;
 
-                        let index = rng.gen_range(0..len);
-                        result.reroll(side_values[index]);
+                let value = result.round() as i64;
+
+                if value < 0 {
+                    return Err("Cannot reroll a negative number of times".into());
+                }
+
+                for result in results.iter_mut() {
+                    for _ in 0..value {
+                        if result.sum() == result.max_value() {
+                            let len = side_values.len();
+
+                            if len == 0 {
+                                continue;
+                            }
+
+                            let index = rng.gen_range(0..len);
+                            result.explode(side_values[index]);
+                        }
                     }
                 }
             }
         }
-        Some(Modifier::Explode(expr)) => {
-            let EvalResult { result, .. } = eval(expr)?;
-
-            let value = result.round() as i64;
-
-            if value < 0 {
-                return Err("Cannot reroll a negative number of times".into());
-            }
-
-            for result in results.iter_mut() {
-                for _ in 0..value {
-                    if result.sum() == result.max_value() {
-                        let len = side_values.len();
-
-                        if len == 0 {
-                            continue;
-                        }
-
-                        let index = rng.gen_range(0..len);
-                        result.explode(side_values[index]);
-                    }
-                }
-            }
-        }
-        None => {}
     }
 
     let mut results_explanation = String::new();
@@ -405,7 +406,7 @@ impl DiceRoll {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct DiceRolls {
     pub values: Vec<DiceRoll>,
     sides: Vec<i64>,
@@ -454,7 +455,8 @@ impl DiceRolls {
     }
 
     // fn min_value(&self) -> i64 {
-    //     *self.sides.iter().min().expect("No sides") * self.values.len() as i64
+    //     *self.sides.iter().min().expect("No sides")
+    //         * self.values.iter().filter(|v| v.count_roll()).count() as i64
     // }
 
     // fn max_side(&self) -> i64 {
@@ -462,7 +464,8 @@ impl DiceRolls {
     // }
 
     fn max_value(&self) -> i64 {
-        *self.sides.iter().max().expect("No sides") * self.values.len() as i64
+        *self.sides.iter().max().expect("No sides")
+            * self.values.iter().filter(|v| v.count_roll()).count() as i64
     }
 
     fn count_roll(&self) -> bool {

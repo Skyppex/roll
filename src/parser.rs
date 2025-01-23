@@ -106,12 +106,12 @@ fn parse_roll(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
     };
 
     let sides = parse_sides(tokens)?;
-    let modifier = parse_modifier(tokens)?;
+    let modifiers = parse_modifiers(tokens)?;
 
     Ok(Expr::Roll {
         rolls: Box::new(rolls),
         sides,
-        modifier,
+        modifiers,
     })
 }
 
@@ -175,80 +175,132 @@ fn parse_sides(tokens: &mut Vec<Token>) -> Result<Sides, Box<dyn Error>> {
     }
 }
 
-fn parse_modifier(tokens: &mut Vec<Token>) -> Result<Option<Modifier>, Box<dyn Error>> {
+fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Error>> {
+    let mut modifiers = vec![];
+
     let mut clone = tokens.clone();
-    let first = clone.pop();
-    let second = clone.pop();
+    let mut first = clone.pop();
+    let mut second = clone.pop();
 
-    match (first, second) {
-        (Some(Token::K), Some(Token::L)) => {
-            tokens.pop();
-            tokens.pop();
+    loop {
+        dbg!(&first);
+        dbg!(&second);
 
-            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
-                return Ok(Some(Modifier::KeepLowest(Box::new(Expr::Int(1)))));
-            }
-
-            let value = parse_primary(tokens)?;
-            Ok(Some(Modifier::KeepLowest(Box::new(value))))
-        }
-        (Some(Token::K), _) => {
-            tokens.pop();
-
-            if tokens.clone().pop() != Some(Token::H) {
+        match (&first, &second) {
+            (Some(Token::K), Some(Token::L)) => {
                 tokens.pop();
-            }
+                tokens.pop();
 
-            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
-                return Ok(Some(Modifier::KeepHighest(Box::new(Expr::Int(1)))));
-            }
+                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                    modifiers.push(Modifier::KeepLowest(Box::new(Expr::Int(1))));
 
-            let value = parse_primary(tokens)?;
-            Ok(Some(Modifier::KeepHighest(Box::new(value))))
+                    first = tokens.clone().pop();
+                    second = tokens.clone().pop();
+                    continue;
+                }
+
+                let value = parse_primary(tokens)?;
+                modifiers.push(Modifier::KeepLowest(Box::new(value)));
+
+                first = tokens.clone().pop();
+                second = tokens.clone().pop();
+            }
+            (Some(Token::K), _) => {
+                tokens.pop();
+
+                if tokens.clone().pop() != Some(Token::H) {
+                    tokens.pop();
+                }
+
+                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                    modifiers.push(Modifier::KeepHighest(Box::new(Expr::Int(1))));
+
+                    first = tokens.clone().pop();
+                    second = tokens.clone().pop();
+                    continue;
+                }
+
+                let value = parse_primary(tokens)?;
+                modifiers.push(Modifier::KeepHighest(Box::new(value)));
+
+                first = tokens.clone().pop();
+                second = tokens.clone().pop();
+            }
+            (Some(Token::D), Some(Token::H)) => {
+                tokens.pop();
+                tokens.pop();
+
+                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                    modifiers.push(Modifier::DropHighest(Box::new(Expr::Int(1))));
+
+                    first = tokens.clone().pop();
+                    second = tokens.clone().pop();
+                    continue;
+                }
+
+                let value = parse_primary(tokens)?;
+                modifiers.push(Modifier::DropHighest(Box::new(value)));
+
+                first = tokens.clone().pop();
+                second = tokens.clone().pop();
+            }
+            (Some(Token::D), _) => {
+                tokens.pop();
+
+                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                    modifiers.push(Modifier::DropLowest(Box::new(Expr::Int(1))));
+
+                    first = tokens.clone().pop();
+                    second = tokens.clone().pop();
+                    continue;
+                }
+
+                let value = parse_primary(tokens)?;
+                modifiers.push(Modifier::DropLowest(Box::new(value)));
+
+                first = tokens.clone().pop();
+                second = tokens.clone().pop();
+            }
+            (Some(Token::R), _) => {
+                tokens.pop();
+
+                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                    modifiers.push(Modifier::Reroll(Box::new(Expr::Int(1))));
+
+                    first = tokens.clone().pop();
+                    second = tokens.clone().pop();
+                    continue;
+                }
+
+                let value = parse_primary(tokens)?;
+                modifiers.push(Modifier::Reroll(Box::new(value)));
+
+                first = tokens.clone().pop();
+                second = tokens.clone().pop();
+            }
+            (Some(Token::Exclamation), _) => {
+                tokens.pop();
+
+                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                    modifiers.push(Modifier::Explode(Box::new(Expr::Int(1))));
+
+                    first = tokens.clone().pop();
+                    second = tokens.clone().pop();
+                    continue;
+                }
+
+                let value = parse_primary(tokens)?;
+                modifiers.push(Modifier::Explode(Box::new(value)));
+
+                first = tokens.clone().pop();
+                second = tokens.clone().pop();
+            }
+            _ => break,
         }
-        (Some(Token::D), Some(Token::H)) => {
-            tokens.pop();
-            tokens.pop();
-
-            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
-                return Ok(Some(Modifier::DropHighest(Box::new(Expr::Int(1)))));
-            }
-
-            let value = parse_primary(tokens)?;
-            Ok(Some(Modifier::DropHighest(Box::new(value))))
-        }
-        (Some(Token::D), _) => {
-            tokens.pop();
-
-            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
-                return Ok(Some(Modifier::DropLowest(Box::new(Expr::Int(1)))));
-            }
-
-            let value = parse_primary(tokens)?;
-            Ok(Some(Modifier::DropLowest(Box::new(value))))
-        }
-        (Some(Token::R), _) => {
-            tokens.pop();
-
-            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
-                return Ok(Some(Modifier::Reroll(Box::new(Expr::Int(1)))));
-            }
-
-            let value = parse_primary(tokens)?;
-            Ok(Some(Modifier::Reroll(Box::new(value))))
-        }
-        (Some(Token::Exclamation), _) => {
-            tokens.pop();
-
-            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
-                return Ok(Some(Modifier::Explode(Box::new(Expr::Int(1)))));
-            }
-
-            let value = parse_primary(tokens)?;
-            Ok(Some(Modifier::Explode(Box::new(value))))
-        }
-        _ => Ok(None),
     }
+
+    dbg!(&modifiers);
+    Ok(modifiers)
 }
 
 fn parse_primary(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
@@ -285,7 +337,7 @@ pub enum Expr {
     Roll {
         rolls: Box<Expr>,
         sides: Sides,
-        modifier: Option<Modifier>,
+        modifiers: Vec<Modifier>,
     },
 }
 
