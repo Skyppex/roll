@@ -183,9 +183,6 @@ fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Err
     let mut second = clone.pop();
 
     loop {
-        dbg!(&first);
-        dbg!(&second);
-
         match (&first, &second) {
             (Some(Token::K), Some(Token::L)) => {
                 tokens.pop();
@@ -194,16 +191,18 @@ fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Err
                 if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::KeepLowest(Box::new(Expr::Int(1))));
 
-                    first = tokens.clone().pop();
-                    second = tokens.clone().pop();
+                    let mut clone = tokens.clone();
+                    first = clone.pop();
+                    second = clone.pop();
                     continue;
                 }
 
                 let value = parse_primary(tokens)?;
                 modifiers.push(Modifier::KeepLowest(Box::new(value)));
 
-                first = tokens.clone().pop();
-                second = tokens.clone().pop();
+                let mut clone = tokens.clone();
+                first = clone.pop();
+                second = clone.pop();
             }
             (Some(Token::K), _) => {
                 tokens.pop();
@@ -215,16 +214,18 @@ fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Err
                 if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::KeepHighest(Box::new(Expr::Int(1))));
 
-                    first = tokens.clone().pop();
-                    second = tokens.clone().pop();
+                    let mut clone = tokens.clone();
+                    first = clone.pop();
+                    second = clone.pop();
                     continue;
                 }
 
                 let value = parse_primary(tokens)?;
                 modifiers.push(Modifier::KeepHighest(Box::new(value)));
 
-                first = tokens.clone().pop();
-                second = tokens.clone().pop();
+                let mut clone = tokens.clone();
+                first = clone.pop();
+                second = clone.pop();
             }
             (Some(Token::D), Some(Token::H)) => {
                 tokens.pop();
@@ -233,16 +234,18 @@ fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Err
                 if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::DropHighest(Box::new(Expr::Int(1))));
 
-                    first = tokens.clone().pop();
-                    second = tokens.clone().pop();
+                    let mut clone = tokens.clone();
+                    first = clone.pop();
+                    second = clone.pop();
                     continue;
                 }
 
                 let value = parse_primary(tokens)?;
                 modifiers.push(Modifier::DropHighest(Box::new(value)));
 
-                first = tokens.clone().pop();
-                second = tokens.clone().pop();
+                let mut clone = tokens.clone();
+                first = clone.pop();
+                second = clone.pop();
             }
             (Some(Token::D), _) => {
                 tokens.pop();
@@ -250,16 +253,18 @@ fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Err
                 if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::DropLowest(Box::new(Expr::Int(1))));
 
-                    first = tokens.clone().pop();
-                    second = tokens.clone().pop();
+                    let mut clone = tokens.clone();
+                    first = clone.pop();
+                    second = clone.pop();
                     continue;
                 }
 
                 let value = parse_primary(tokens)?;
                 modifiers.push(Modifier::DropLowest(Box::new(value)));
 
-                first = tokens.clone().pop();
-                second = tokens.clone().pop();
+                let mut clone = tokens.clone();
+                first = clone.pop();
+                second = clone.pop();
             }
             (Some(Token::R), _) => {
                 tokens.pop();
@@ -267,16 +272,18 @@ fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Err
                 if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::Reroll(Box::new(Expr::Int(1))));
 
-                    first = tokens.clone().pop();
-                    second = tokens.clone().pop();
+                    let mut clone = tokens.clone();
+                    first = clone.pop();
+                    second = clone.pop();
                     continue;
                 }
 
                 let value = parse_primary(tokens)?;
                 modifiers.push(Modifier::Reroll(Box::new(value)));
 
-                first = tokens.clone().pop();
-                second = tokens.clone().pop();
+                let mut clone = tokens.clone();
+                first = clone.pop();
+                second = clone.pop();
             }
             (Some(Token::Exclamation), _) => {
                 tokens.pop();
@@ -284,22 +291,23 @@ fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Err
                 if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::Explode(Box::new(Expr::Int(1))));
 
-                    first = tokens.clone().pop();
-                    second = tokens.clone().pop();
+                    let mut clone = tokens.clone();
+                    first = clone.pop();
+                    second = clone.pop();
                     continue;
                 }
 
                 let value = parse_primary(tokens)?;
                 modifiers.push(Modifier::Explode(Box::new(value)));
 
-                first = tokens.clone().pop();
-                second = tokens.clone().pop();
+                let mut clone = tokens.clone();
+                first = clone.pop();
+                second = clone.pop();
             }
             _ => break,
         }
     }
 
-    dbg!(&modifiers);
     Ok(modifiers)
 }
 

@@ -232,6 +232,23 @@ fn eval_roll(
                     results[i].drop()
                 }
             }
+            Modifier::DropHighest(expr) => {
+                let EvalResult { result, .. } = eval(expr)?;
+
+                let value = result.round() as i64;
+
+                if value < 0 {
+                    return Err("Cannot drop a negative number of dice".into());
+                }
+
+                if value > rolls {
+                    return Err("Cannot drop more dice than rolled".into());
+                }
+
+                results.sort_by_key(|b| std::cmp::Reverse(b.sum()));
+
+                (0..value as usize).for_each(|i| results[i].drop());
+            }
             Modifier::DropLowest(expr) => {
                 let EvalResult { result, .. } = eval(expr)?;
 
@@ -250,23 +267,6 @@ fn eval_roll(
                 (0..value as usize).for_each(|i| results[i].drop());
 
                 results.reverse();
-            }
-            Modifier::DropHighest(expr) => {
-                let EvalResult { result, .. } = eval(expr)?;
-
-                let value = result.round() as i64;
-
-                if value < 0 {
-                    return Err("Cannot drop a negative number of dice".into());
-                }
-
-                if value > rolls {
-                    return Err("Cannot drop more dice than rolled".into());
-                }
-
-                results.sort_by_key(|b| std::cmp::Reverse(b.sum()));
-
-                (0..value as usize).for_each(|i| results[i].drop());
             }
             Modifier::Reroll(expr) => {
                 let EvalResult { result, .. } = eval(expr)?;
@@ -365,14 +365,14 @@ fn to_fudge(roll_str: &str, is_fudge: bool) -> Result<String, Box<dyn Error>> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct EvalResult {
     pub result: f64,
     pub explanation: String,
     pub is_roll: bool,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DiceRoll {
     pub value: i64,
     modification: Option<Modification>,
@@ -406,7 +406,7 @@ impl DiceRoll {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DiceRolls {
     pub values: Vec<DiceRoll>,
     sides: Vec<i64>,
@@ -507,7 +507,7 @@ impl DiceRolls {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Modification {
     Dropped,
     Rerolled,
