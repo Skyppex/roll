@@ -5,7 +5,7 @@ use std::{
 
 use crate::{
     cli::Cli,
-    evaluator::{eval, DiceRollResult},
+    evaluator::{eval, EvalResult},
     parser::parse,
     tokenizer::tokenize,
 };
@@ -46,7 +46,7 @@ pub fn run<R: Read, W: Write>(
     Ok(())
 }
 
-fn format_result(result: DiceRollResult, cli: &Cli) -> String {
+fn format_result(result: EvalResult, cli: &Cli) -> String {
     if cli.explain {
         format!("{} : {}", result.result, result.explanation)
     } else {

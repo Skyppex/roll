@@ -21,7 +21,7 @@ pub fn tokenize(expression: &str) -> Result<Vec<Token>, Box<dyn std::error::Erro
             'k' => tokens.push(Token::K),
             'h' => tokens.push(Token::H),
             'l' => tokens.push(Token::L),
-            '!' => tokens.push(Token::Explanation),
+            '!' => tokens.push(Token::Exclamation),
             'r' => tokens.push(Token::R),
             '0'..='9' => {
                 let mut value = c.to_string();
@@ -83,6 +83,6 @@ pub enum Token {
     K,           // Keep
     H,           // Highest
     L,           // Lowest
-    Explanation, // Explode
+    Exclamation, // Explode
     R,           // Reroll
 }

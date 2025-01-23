@@ -1,6 +1,6 @@
 use std::{error::Error, fmt::Display};
 
-use crate::{evaluator::eval, tokenizer::Token};
+use crate::tokenizer::Token;
 
 pub fn parse(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
     tokens.reverse(); // reverse so we can pop from the end
@@ -106,10 +106,12 @@ fn parse_roll(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
     };
 
     let sides = parse_sides(tokens)?;
+    let modifier = parse_modifier(tokens)?;
 
     Ok(Expr::Roll {
         rolls: Box::new(rolls),
         sides,
+        modifier,
     })
 }
 
@@ -173,6 +175,82 @@ fn parse_sides(tokens: &mut Vec<Token>) -> Result<Sides, Box<dyn Error>> {
     }
 }
 
+fn parse_modifier(tokens: &mut Vec<Token>) -> Result<Option<Modifier>, Box<dyn Error>> {
+    let mut clone = tokens.clone();
+    let first = clone.pop();
+    let second = clone.pop();
+
+    match (first, second) {
+        (Some(Token::K), Some(Token::L)) => {
+            tokens.pop();
+            tokens.pop();
+
+            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                return Ok(Some(Modifier::KeepLowest(Box::new(Expr::Int(1)))));
+            }
+
+            let value = parse_primary(tokens)?;
+            Ok(Some(Modifier::KeepLowest(Box::new(value))))
+        }
+        (Some(Token::K), _) => {
+            tokens.pop();
+
+            if tokens.clone().pop() != Some(Token::H) {
+                tokens.pop();
+            }
+
+            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                return Ok(Some(Modifier::KeepHighest(Box::new(Expr::Int(1)))));
+            }
+
+            let value = parse_primary(tokens)?;
+            Ok(Some(Modifier::KeepHighest(Box::new(value))))
+        }
+        (Some(Token::D), Some(Token::H)) => {
+            tokens.pop();
+            tokens.pop();
+
+            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                return Ok(Some(Modifier::DropHighest(Box::new(Expr::Int(1)))));
+            }
+
+            let value = parse_primary(tokens)?;
+            Ok(Some(Modifier::DropHighest(Box::new(value))))
+        }
+        (Some(Token::D), _) => {
+            tokens.pop();
+
+            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                return Ok(Some(Modifier::DropLowest(Box::new(Expr::Int(1)))));
+            }
+
+            let value = parse_primary(tokens)?;
+            Ok(Some(Modifier::DropLowest(Box::new(value))))
+        }
+        (Some(Token::R), _) => {
+            tokens.pop();
+
+            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                return Ok(Some(Modifier::Reroll(Box::new(Expr::Int(1)))));
+            }
+
+            let value = parse_primary(tokens)?;
+            Ok(Some(Modifier::Reroll(Box::new(value))))
+        }
+        (Some(Token::Exclamation), _) => {
+            tokens.pop();
+
+            if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                return Ok(Some(Modifier::Explode(Box::new(Expr::Int(1)))));
+            }
+
+            let value = parse_primary(tokens)?;
+            Ok(Some(Modifier::Explode(Box::new(value))))
+        }
+        _ => Ok(None),
+    }
+}
+
 fn parse_primary(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
     match tokens.pop() {
         Some(Token::Int(value)) => Ok(Expr::Int(value)),
@@ -207,6 +285,7 @@ pub enum Expr {
     Roll {
         rolls: Box<Expr>,
         sides: Sides,
+        modifier: Option<Modifier>,
     },
 }
 
@@ -241,23 +320,12 @@ pub enum Sides {
     Fudge,
 }
 
-impl Sides {
-    pub fn explain(&self) -> String {
-        match self {
-            Sides::Expr(expr) => eval(expr).unwrap().explanation,
-            Sides::Range { min, max } => format!(
-                "{}..{}",
-                eval(min).unwrap().explanation,
-                eval(max).unwrap().explanation
-            ),
-            Sides::Values(values) => {
-                let values = values
-                    .iter()
-                    .map(|v| eval(v).unwrap().explanation)
-                    .collect::<Vec<_>>();
-                values.join(", ")
-            }
-            Sides::Fudge => "f".to_string(),
-        }
-    }
+#[derive(Debug, Clone)]
+pub enum Modifier {
+    KeepHighest(Box<Expr>),
+    KeepLowest(Box<Expr>),
+    DropHighest(Box<Expr>),
+    DropLowest(Box<Expr>),
+    Reroll(Box<Expr>),
+    Explode(Box<Expr>),
 }
