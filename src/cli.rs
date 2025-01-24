@@ -4,6 +4,7 @@ use clap::{ArgGroup, Parser};
 #[derive(Debug, Clone, Parser)]
 #[command(version, author, about)]
 #[command(group=ArgGroup::new("log").args(["verbose", "quiet"]).multiple(false))]
+#[command(group=ArgGroup::new("multi").args(["source", "amount"]).multiple(false))]
 pub struct Cli {
     /// The source file to read from. If not provided, read from stdin.
     #[arg(short, long)]

@@ -10,23 +10,21 @@ use crate::{
     parser::{parse, Cursor},
 };
 
-pub fn run<R: Read, W: Write>(
-    mut reader: R,
-    mut writer: W,
-    cli: Cli,
-) -> Result<(), Box<dyn Error>> {
+pub fn run<R: Read, W: Write>(reader: R, writer: W, cli: Cli) -> Result<(), Box<dyn Error>> {
     // tokenize expression string
-    let mut buf = String::new();
-
     let expression = cli.expression.join(" ");
 
     if !expression.is_empty() {
-        buf.push_str(&expression);
+        run_amount(writer, &expression, &cli)?;
     } else {
-        reader.read_to_string(&mut buf)?;
+        run_lines(reader, writer, cli)?;
     }
 
-    let tokens = tokenize(&buf)?;
+    Ok(())
+}
+
+fn run_amount<W: Write>(mut writer: W, buf: &str, cli: &Cli) -> Result<(), Box<dyn Error>> {
+    let tokens = tokenize(buf)?;
 
     cli.verbose(|| dbg!(&tokens));
 
@@ -38,11 +36,48 @@ pub fn run<R: Read, W: Write>(
 
     for _ in 0..cli.amount.unwrap_or(1) - 1 {
         let result = eval(&tree)?;
-        writeln!(writer, "{}", format_result(result, &cli))?;
+        writeln!(writer, "{}", format_result(result, cli))?;
     }
 
     let result = eval(&tree)?;
-    write!(writer, "{}", format_result(result, &cli))?;
+    write!(writer, "{}", format_result(result, cli))?;
+    Ok(())
+}
+
+fn run_lines<R: Read, W: Write>(
+    mut reader: R,
+    mut writer: W,
+    cli: Cli,
+) -> Result<(), Box<dyn Error>> {
+    let mut buf = String::new();
+    reader.read_to_string(&mut buf)?;
+
+    let lines = buf.lines();
+    let lines_count = lines.clone().count();
+
+    for (i, line) in buf.lines().enumerate() {
+        if line.is_empty() {
+            continue;
+        }
+
+        let tokens = tokenize(line)?;
+
+        cli.verbose(|| dbg!(&tokens));
+
+        // parse tokens
+        let mut cursor = Cursor::new(tokens);
+        let tree = parse(&mut cursor)?;
+        cli.verbose(|| dbg!(&tree));
+        cli.verbose(|| eprintln!());
+
+        if i < lines_count - 1 {
+            let result = eval(&tree)?;
+            writeln!(writer, "{}", format_result(result, &cli))?;
+        } else {
+            let result = eval(&tree)?;
+            write!(writer, "{}", format_result(result, &cli))?;
+        }
+    }
 
     Ok(())
 }
