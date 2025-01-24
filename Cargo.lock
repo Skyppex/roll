@@ -222,6 +222,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "r"
+version = "0.1.0"
+dependencies = [
+ "atty",
+ "clap",
+ "dirs",
+ "rand",
+]
+
+[[package]]
 name = "rand"
 version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -260,16 +270,6 @@ dependencies = [
  "getrandom",
  "libredox",
  "thiserror",
-]
-
-[[package]]
-name = "roll"
-version = "0.1.0"
-dependencies = [
- "atty",
- "clap",
- "dirs",
- "rand",
 ]
 
 [[package]]

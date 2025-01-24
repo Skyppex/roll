@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use crate::lexer::Token;
 
 pub struct Cursor {
@@ -29,11 +27,11 @@ impl Cursor {
         }
     }
 
-    pub fn bump(&mut self) -> Result<Token, Box<dyn Error>> {
+    pub fn bump(&mut self) -> Option<Token> {
         if self.tokens.first().is_some() {
-            Ok(self.tokens.remove(0))
+            Some(self.tokens.remove(0))
         } else {
-            Err("Unexpected end of input".into())
+            None
         }
     }
 }

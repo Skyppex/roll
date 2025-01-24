@@ -19,7 +19,7 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
     while let Some(token) = cursor.first() {
         match token {
             Token::Add => {
-                cursor.bump()?;
+                cursor.bump();
                 let right = parse_multiplicative(cursor)?;
 
                 expr = Expr::Additive {
@@ -29,7 +29,7 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
                 };
             }
             Token::Sub => {
-                cursor.bump()?;
+                cursor.bump();
                 let right = parse_multiplicative(cursor)?;
 
                 expr = Expr::Additive {
@@ -51,7 +51,7 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
     while let Some(token) = cursor.first() {
         match token {
             Token::Mul => {
-                cursor.bump()?;
+                cursor.bump();
                 let right = parse_roll(cursor)?;
 
                 expr = Expr::Multiplicative {
@@ -61,7 +61,7 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
                 };
             }
             Token::Div => {
-                cursor.bump()?;
+                cursor.bump();
                 let right = parse_roll(cursor)?;
 
                 expr = Expr::Multiplicative {
@@ -71,7 +71,7 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
                 };
             }
             Token::Mod => {
-                cursor.bump()?;
+                cursor.bump();
                 let right = parse_roll(cursor)?;
 
                 expr = Expr::Multiplicative {
@@ -97,12 +97,12 @@ fn parse_roll(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
     let rolls = match (rolls, cursor.first()) {
         (Some(Expr::Float(v)), _) => return Ok(Expr::Float(v)),
         (Some(t), Some(Token::D)) => {
-            cursor.bump()?;
+            cursor.bump();
             t
         }
         (Some(t), _) => return Ok(t),
         (None, _) => {
-            cursor.bump()?;
+            cursor.bump();
             Expr::Int(1)
         }
     };
@@ -118,7 +118,7 @@ fn parse_roll(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
 }
 
 fn parse_sides(cursor: &mut Cursor) -> Result<Sides, Box<dyn Error>> {
-    match cursor.bump().ok() {
+    match cursor.bump() {
         Some(Token::Int(value)) => Ok(Sides::Expr(Box::new(Expr::Int(value)))),
         Some(Token::Float(_)) => Err("Cannot use float for number of sides".into()),
         Some(Token::OpenBracket) => {
@@ -131,7 +131,7 @@ fn parse_sides(cursor: &mut Cursor) -> Result<Sides, Box<dyn Error>> {
                 return Err("Expected ',' or '..'".into());
             }
 
-            match cursor.bump().ok() {
+            match cursor.bump() {
                 Some(Token::Comma) => {
                     let mut values = vec![value];
 
@@ -144,7 +144,7 @@ fn parse_sides(cursor: &mut Cursor) -> Result<Sides, Box<dyn Error>> {
                     Ok(Sides::Values(values))
                 }
                 Some(Token::Dot) => {
-                    cursor.bump()?; // pop the second dot
+                    cursor.bump(); // pop the second dot
 
                     let min = value;
                     let max = parse_expr(cursor)?;
@@ -175,8 +175,8 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>>
     loop {
         match (cursor.first(), cursor.second()) {
             (Some(Token::K), Some(Token::L)) => {
-                cursor.bump()?;
-                cursor.bump()?;
+                cursor.bump();
+                cursor.bump();
 
                 if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::KeepLowest(Box::new(Expr::Int(1))));
@@ -187,10 +187,10 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>>
                 modifiers.push(Modifier::KeepLowest(Box::new(value)));
             }
             (Some(Token::K), _) => {
-                cursor.bump()?;
+                cursor.bump();
 
                 if cursor.first() != Some(Token::H) {
-                    cursor.bump()?;
+                    cursor.bump();
                 }
 
                 if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
@@ -202,8 +202,8 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>>
                 modifiers.push(Modifier::KeepHighest(Box::new(value)));
             }
             (Some(Token::D), Some(Token::H)) => {
-                cursor.bump()?;
-                cursor.bump()?;
+                cursor.bump();
+                cursor.bump();
 
                 if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::DropHighest(Box::new(Expr::Int(1))));
@@ -214,7 +214,7 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>>
                 modifiers.push(Modifier::DropHighest(Box::new(value)));
             }
             (Some(Token::D), _) => {
-                cursor.bump()?;
+                cursor.bump();
 
                 if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::DropLowest(Box::new(Expr::Int(1))));
@@ -225,7 +225,7 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>>
                 modifiers.push(Modifier::DropLowest(Box::new(value)));
             }
             (Some(Token::R), _) => {
-                cursor.bump()?;
+                cursor.bump();
 
                 if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::Reroll(Box::new(Expr::Int(1))));
@@ -236,7 +236,7 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>>
                 modifiers.push(Modifier::Reroll(Box::new(value)));
             }
             (Some(Token::Exclamation), _) => {
-                cursor.bump()?;
+                cursor.bump();
 
                 if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::Explode(Box::new(Expr::Int(1))));
@@ -254,7 +254,7 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>>
 }
 
 fn parse_primary(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
-    match cursor.bump().ok() {
+    match cursor.bump() {
         Some(Token::Int(value)) => Ok(Expr::Int(value)),
         Some(Token::Float(value)) => Ok(Expr::Float(value)),
         Some(Token::OpenParen) => {
