@@ -6,8 +6,8 @@ use std::{
 use crate::{
     cli::Cli,
     evaluator::{eval, EvalResult},
-    parser::parse,
-    tokenizer::tokenize,
+    lexer::tokenize,
+    parser::{parse, Cursor},
 };
 
 pub fn run<R: Read, W: Write>(
@@ -26,12 +26,13 @@ pub fn run<R: Read, W: Write>(
         reader.read_to_string(&mut buf)?;
     }
 
-    let mut tokens = tokenize(&buf)?;
+    let tokens = tokenize(&buf)?;
 
     cli.verbose(|| dbg!(&tokens));
 
     // parse tokens
-    let tree = parse(&mut tokens)?;
+    let mut cursor = Cursor::new(tokens);
+    let tree = parse(&mut cursor)?;
     cli.verbose(|| dbg!(&tree));
     cli.verbose(|| eprintln!());
 

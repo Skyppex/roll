@@ -1,24 +1,26 @@
+mod cursor;
+pub use cursor::*;
+
 use std::{error::Error, fmt::Display};
 
-use crate::tokenizer::Token;
+use crate::lexer::Token;
 
-pub fn parse(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
-    tokens.reverse(); // reverse so we can pop from the end
-    parse_expr(tokens)
+pub fn parse(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+    parse_expr(cursor)
 }
 
-fn parse_expr(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
-    parse_additive(tokens)
+fn parse_expr(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+    parse_additive(cursor)
 }
 
-fn parse_additive(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
-    let mut expr = parse_multiplicative(tokens)?;
+fn parse_additive(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+    let mut expr = parse_multiplicative(cursor)?;
 
-    while let Some(token) = tokens.clone().pop() {
+    while let Some(token) = cursor.first() {
         match token {
             Token::Add => {
-                tokens.pop();
-                let right = parse_multiplicative(tokens)?;
+                cursor.bump()?;
+                let right = parse_multiplicative(cursor)?;
 
                 expr = Expr::Additive {
                     left: Box::new(expr),
@@ -27,8 +29,8 @@ fn parse_additive(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
                 };
             }
             Token::Sub => {
-                tokens.pop();
-                let right = parse_multiplicative(tokens)?;
+                cursor.bump()?;
+                let right = parse_multiplicative(cursor)?;
 
                 expr = Expr::Additive {
                     left: Box::new(expr),
@@ -43,14 +45,14 @@ fn parse_additive(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
     Ok(expr)
 }
 
-fn parse_multiplicative(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
-    let mut expr = parse_roll(tokens)?;
+fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+    let mut expr = parse_roll(cursor)?;
 
-    while let Some(token) = tokens.clone().pop() {
+    while let Some(token) = cursor.first() {
         match token {
             Token::Mul => {
-                tokens.pop();
-                let right = parse_roll(tokens)?;
+                cursor.bump()?;
+                let right = parse_roll(cursor)?;
 
                 expr = Expr::Multiplicative {
                     left: Box::new(expr),
@@ -59,8 +61,8 @@ fn parse_multiplicative(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>>
                 };
             }
             Token::Div => {
-                tokens.pop();
-                let right = parse_roll(tokens)?;
+                cursor.bump()?;
+                let right = parse_roll(cursor)?;
 
                 expr = Expr::Multiplicative {
                     left: Box::new(expr),
@@ -69,8 +71,8 @@ fn parse_multiplicative(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>>
                 };
             }
             Token::Mod => {
-                tokens.pop();
-                let right = parse_roll(tokens)?;
+                cursor.bump()?;
+                let right = parse_roll(cursor)?;
 
                 expr = Expr::Multiplicative {
                     left: Box::new(expr),
@@ -85,28 +87,28 @@ fn parse_multiplicative(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>>
     Ok(expr)
 }
 
-fn parse_roll(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
-    let rolls = if tokens.clone().pop() != Some(Token::D) {
-        Some(parse_primary(tokens)?)
+fn parse_roll(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+    let rolls = if cursor.first() != Some(Token::D) {
+        Some(parse_primary(cursor)?)
     } else {
         None
     };
 
-    let rolls = match (rolls, tokens.clone().pop()) {
+    let rolls = match (rolls, cursor.first()) {
         (Some(Expr::Float(v)), _) => return Ok(Expr::Float(v)),
         (Some(t), Some(Token::D)) => {
-            tokens.pop();
+            cursor.bump()?;
             t
         }
         (Some(t), _) => return Ok(t),
         (None, _) => {
-            tokens.pop();
+            cursor.bump()?;
             Expr::Int(1)
         }
     };
 
-    let sides = parse_sides(tokens)?;
-    let modifiers = parse_modifiers(tokens)?;
+    let sides = parse_sides(cursor)?;
+    let modifiers = parse_modifiers(cursor)?;
 
     Ok(Expr::Roll {
         rolls: Box::new(rolls),
@@ -115,43 +117,39 @@ fn parse_roll(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
     })
 }
 
-fn parse_sides(tokens: &mut Vec<Token>) -> Result<Sides, Box<dyn Error>> {
-    match tokens.pop() {
+fn parse_sides(cursor: &mut Cursor) -> Result<Sides, Box<dyn Error>> {
+    match cursor.bump().ok() {
         Some(Token::Int(value)) => Ok(Sides::Expr(Box::new(Expr::Int(value)))),
         Some(Token::Float(_)) => Err("Cannot use float for number of sides".into()),
         Some(Token::OpenBracket) => {
-            let value = parse_expr(tokens)?;
+            let value = parse_expr(cursor)?;
 
             if !matches!(
-                (tokens.clone().pop(), tokens.clone().pop()),
+                (cursor.first(), cursor.second()),
                 (Some(Token::Comma), Some(_)) | (Some(Token::Dot), Some(Token::Dot))
             ) {
                 return Err("Expected ',' or '..'".into());
             }
 
-            match tokens.pop() {
+            match cursor.bump().ok() {
                 Some(Token::Comma) => {
                     let mut values = vec![value];
 
-                    while tokens.clone().pop() != Some(Token::Comma) {
-                        values.push(parse_expr(tokens)?);
+                    while cursor.first() != Some(Token::Comma) {
+                        values.push(parse_expr(cursor)?);
                     }
 
-                    if tokens.pop() != Some(Token::CloseBracket) {
-                        return Err("Expected ']'".into());
-                    }
+                    cursor.expect(Token::CloseBracket)?;
 
                     Ok(Sides::Values(values))
                 }
                 Some(Token::Dot) => {
-                    tokens.pop(); // pop the second dot
+                    cursor.bump()?; // pop the second dot
 
                     let min = value;
-                    let max = parse_expr(tokens)?;
+                    let max = parse_expr(cursor)?;
 
-                    if tokens.pop() != Some(Token::CloseBracket) {
-                        return Err("Expected ']'".into());
-                    }
+                    cursor.expect(Token::CloseBracket)?;
 
                     Ok(Sides::Range {
                         min: Box::new(min),
@@ -162,12 +160,8 @@ fn parse_sides(tokens: &mut Vec<Token>) -> Result<Sides, Box<dyn Error>> {
             }
         }
         Some(Token::OpenParen) => {
-            let sides = Sides::Expr(Box::new(parse_expr(tokens)?));
-
-            if tokens.pop() != Some(Token::CloseParen) {
-                return Err("Expected closing parenthesis".into());
-            }
-
+            let sides = Sides::Expr(Box::new(parse_expr(cursor)?));
+            cursor.expect(Token::CloseParen)?;
             Ok(sides)
         }
         Some(Token::F) => Ok(Sides::Fudge),
@@ -175,134 +169,82 @@ fn parse_sides(tokens: &mut Vec<Token>) -> Result<Sides, Box<dyn Error>> {
     }
 }
 
-fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Error>> {
+fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>> {
     let mut modifiers = vec![];
 
-    let mut clone = tokens.clone();
-    let mut first = clone.pop();
-    let mut second = clone.pop();
-
     loop {
-        match (&first, &second) {
+        match (cursor.first(), cursor.second()) {
             (Some(Token::K), Some(Token::L)) => {
-                tokens.pop();
-                tokens.pop();
+                cursor.bump()?;
+                cursor.bump()?;
 
-                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::KeepLowest(Box::new(Expr::Int(1))));
-
-                    let mut clone = tokens.clone();
-                    first = clone.pop();
-                    second = clone.pop();
                     continue;
                 }
 
-                let value = parse_primary(tokens)?;
+                let value = parse_primary(cursor)?;
                 modifiers.push(Modifier::KeepLowest(Box::new(value)));
-
-                let mut clone = tokens.clone();
-                first = clone.pop();
-                second = clone.pop();
             }
             (Some(Token::K), _) => {
-                tokens.pop();
+                cursor.bump()?;
 
-                if tokens.clone().pop() != Some(Token::H) {
-                    tokens.pop();
+                if cursor.first() != Some(Token::H) {
+                    cursor.bump()?;
                 }
 
-                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::KeepHighest(Box::new(Expr::Int(1))));
-
-                    let mut clone = tokens.clone();
-                    first = clone.pop();
-                    second = clone.pop();
                     continue;
                 }
 
-                let value = parse_primary(tokens)?;
+                let value = parse_primary(cursor)?;
                 modifiers.push(Modifier::KeepHighest(Box::new(value)));
-
-                let mut clone = tokens.clone();
-                first = clone.pop();
-                second = clone.pop();
             }
             (Some(Token::D), Some(Token::H)) => {
-                tokens.pop();
-                tokens.pop();
+                cursor.bump()?;
+                cursor.bump()?;
 
-                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::DropHighest(Box::new(Expr::Int(1))));
-
-                    let mut clone = tokens.clone();
-                    first = clone.pop();
-                    second = clone.pop();
                     continue;
                 }
 
-                let value = parse_primary(tokens)?;
+                let value = parse_primary(cursor)?;
                 modifiers.push(Modifier::DropHighest(Box::new(value)));
-
-                let mut clone = tokens.clone();
-                first = clone.pop();
-                second = clone.pop();
             }
             (Some(Token::D), _) => {
-                tokens.pop();
+                cursor.bump()?;
 
-                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::DropLowest(Box::new(Expr::Int(1))));
-
-                    let mut clone = tokens.clone();
-                    first = clone.pop();
-                    second = clone.pop();
                     continue;
                 }
 
-                let value = parse_primary(tokens)?;
+                let value = parse_primary(cursor)?;
                 modifiers.push(Modifier::DropLowest(Box::new(value)));
-
-                let mut clone = tokens.clone();
-                first = clone.pop();
-                second = clone.pop();
             }
             (Some(Token::R), _) => {
-                tokens.pop();
+                cursor.bump()?;
 
-                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::Reroll(Box::new(Expr::Int(1))));
-
-                    let mut clone = tokens.clone();
-                    first = clone.pop();
-                    second = clone.pop();
                     continue;
                 }
 
-                let value = parse_primary(tokens)?;
+                let value = parse_primary(cursor)?;
                 modifiers.push(Modifier::Reroll(Box::new(value)));
-
-                let mut clone = tokens.clone();
-                first = clone.pop();
-                second = clone.pop();
             }
             (Some(Token::Exclamation), _) => {
-                tokens.pop();
+                cursor.bump()?;
 
-                if !matches!(tokens.clone().pop(), Some(Token::Int(_) | Token::OpenParen)) {
+                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
                     modifiers.push(Modifier::Explode(Box::new(Expr::Int(1))));
-
-                    let mut clone = tokens.clone();
-                    first = clone.pop();
-                    second = clone.pop();
                     continue;
                 }
 
-                let value = parse_primary(tokens)?;
+                let value = parse_primary(cursor)?;
                 modifiers.push(Modifier::Explode(Box::new(value)));
-
-                let mut clone = tokens.clone();
-                first = clone.pop();
-                second = clone.pop();
             }
             _ => break,
         }
@@ -311,17 +253,13 @@ fn parse_modifiers(tokens: &mut Vec<Token>) -> Result<Vec<Modifier>, Box<dyn Err
     Ok(modifiers)
 }
 
-fn parse_primary(tokens: &mut Vec<Token>) -> Result<Expr, Box<dyn Error>> {
-    match tokens.pop() {
+fn parse_primary(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+    match cursor.bump().ok() {
         Some(Token::Int(value)) => Ok(Expr::Int(value)),
         Some(Token::Float(value)) => Ok(Expr::Float(value)),
         Some(Token::OpenParen) => {
-            let expr = parse_expr(tokens)?;
-
-            if tokens.pop() != Some(Token::CloseParen) {
-                return Err("Expected closing parenthesis".into());
-            }
-
+            let expr = parse_expr(cursor)?;
+            cursor.expect(Token::CloseParen)?;
             Ok(expr)
         }
         _ => Err("Expected primary expression".into()),

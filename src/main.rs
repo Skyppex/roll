@@ -1,10 +1,10 @@
 mod cli;
 mod evaluator;
 mod io_utils;
+mod lexer;
 mod parser;
 mod path_utils;
 mod program;
-mod tokenizer;
 
 use std::io::Result;
 
