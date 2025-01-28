@@ -2,7 +2,7 @@ use std::error::Error;
 
 use rand::Rng;
 
-use crate::parser::{BinOp, Expr, Modifier, Sides};
+use crate::parser::{BinOp, Condition, Expr, Modifier, RelOp, Sides};
 
 pub fn eval(tree: &Expr) -> Result<EvalResult, Box<dyn std::error::Error>> {
     match tree {
@@ -268,8 +268,8 @@ fn eval_roll(
 
                 results.reverse();
             }
-            Modifier::Reroll(expr) => {
-                let EvalResult { result, .. } = eval(expr)?;
+            Modifier::Reroll { amount, condition } => {
+                let EvalResult { result, .. } = eval(amount)?;
 
                 let value = result.round() as i64;
 
@@ -277,23 +277,37 @@ fn eval_roll(
                     return Err("Cannot reroll a negative number of times".into());
                 }
 
+                let condition = if let Some(c) = condition {
+                    let Condition { operator, value } = c;
+
+                    Some((operator, eval(value)?))
+                } else {
+                    None
+                };
+
                 for result in results.iter_mut() {
                     for _ in 0..value {
-                        if result.sum() == result.min_side() {
-                            let len = side_values.len();
-
-                            if len == 0 {
+                        if let Some((operator, ref condition_value)) = condition {
+                            if !rel_op_eval(operator, result, condition_value)? {
                                 continue;
                             }
-
-                            let index = rng.gen_range(0..len);
-                            result.reroll(side_values[index]);
+                        } else if result.sum() != result.min_side() {
+                            continue;
                         }
+
+                        let len = side_values.len();
+
+                        if len == 0 {
+                            continue;
+                        }
+
+                        let index = rng.gen_range(0..len);
+                        result.reroll(side_values[index]);
                     }
                 }
             }
-            Modifier::Explode(expr) => {
-                let EvalResult { result, .. } = eval(expr)?;
+            Modifier::Explode { amount, condition } => {
+                let EvalResult { result, .. } = eval(amount)?;
 
                 let value = result.round() as i64;
 
@@ -301,18 +315,32 @@ fn eval_roll(
                     return Err("Cannot reroll a negative number of times".into());
                 }
 
+                let condition = if let Some(c) = condition {
+                    let Condition { operator, value } = c;
+
+                    Some((operator, eval(value)?))
+                } else {
+                    None
+                };
+
                 for result in results.iter_mut() {
                     for _ in 0..value {
-                        if result.sum() == result.max_value() {
-                            let len = side_values.len();
-
-                            if len == 0 {
+                        if let Some((operator, ref condition_value)) = condition {
+                            if !rel_op_eval(operator, result, condition_value)? {
                                 continue;
                             }
-
-                            let index = rng.gen_range(0..len);
-                            result.explode(side_values[index]);
+                        } else if result.last() != result.max_side() {
+                            continue;
                         }
+
+                        let len = side_values.len();
+
+                        if len == 0 {
+                            continue;
+                        }
+
+                        let index = rng.gen_range(0..len);
+                        result.explode(side_values[index]);
                     }
                 }
             }
@@ -363,6 +391,24 @@ fn to_fudge(roll_str: &str, is_fudge: bool) -> Result<String, Box<dyn Error>> {
         "0" => Ok("o".to_string()),
         _ => Err("Invalid fudge value".into()),
     }
+}
+
+fn rel_op_eval(
+    operator: &RelOp,
+    left: &DiceRolls,
+    right: &EvalResult,
+) -> Result<bool, Box<dyn Error>> {
+    let left = left.last() as f64;
+    let right = right.result;
+
+    Ok(match operator {
+        RelOp::Equals => left == right,
+        RelOp::NotEquals => left != right,
+        RelOp::Greater => left > right,
+        RelOp::GreaterEqual => left >= right,
+        RelOp::Less => left < right,
+        RelOp::LessEqual => left <= right,
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -459,14 +505,14 @@ impl DiceRolls {
     //         * self.values.iter().filter(|v| v.count_roll()).count() as i64
     // }
 
-    // fn max_side(&self) -> i64 {
-    //     *self.sides.iter().max().expect("No sides")
-    // }
-
-    fn max_value(&self) -> i64 {
+    fn max_side(&self) -> i64 {
         *self.sides.iter().max().expect("No sides")
-            * self.values.iter().filter(|v| v.count_roll()).count() as i64
     }
+
+    // fn max_value(&self) -> i64 {
+    //     *self.sides.iter().max().expect("No sides")
+    //         * self.values.iter().filter(|v| v.count_roll()).count() as i64
+    // }
 
     fn count_roll(&self) -> bool {
         matches!(&self.modification, None | Some(Modification::Exploded))
@@ -482,6 +528,10 @@ impl DiceRolls {
         } else {
             0
         }
+    }
+
+    fn last(&self) -> i64 {
+        self.values.last().expect("No values").value
     }
 
     fn explain(&self) -> String {

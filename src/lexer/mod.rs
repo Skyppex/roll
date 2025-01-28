@@ -23,6 +23,10 @@ pub fn tokenize(expression: &str) -> Result<Vec<Token>, Box<dyn std::error::Erro
             'l' => tokens.push(Token::L),
             '!' => tokens.push(Token::Exclamation),
             'r' => tokens.push(Token::R),
+            '=' => tokens.push(Token::Equals),
+            '>' => tokens.push(Token::Greater),
+            '<' => tokens.push(Token::Less),
+            '~' => tokens.push(Token::Tilde),
             '0'..='9' => {
                 let mut value = c.to_string();
 
@@ -85,4 +89,10 @@ pub enum Token {
     L,           // Lowest
     Exclamation, // Explode
     R,           // Reroll
+
+    // Conditions
+    Equals,
+    Greater,
+    Less,
+    Tilde,
 }

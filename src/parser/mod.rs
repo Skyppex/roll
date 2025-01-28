@@ -1,5 +1,7 @@
 mod cursor;
-pub use cursor::*;
+mod roll_parser;
+
+pub use cursor::Cursor;
 
 use std::{error::Error, fmt::Display};
 
@@ -107,150 +109,7 @@ fn parse_roll(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
         }
     };
 
-    let sides = parse_sides(cursor)?;
-    let modifiers = parse_modifiers(cursor)?;
-
-    Ok(Expr::Roll {
-        rolls: Box::new(rolls),
-        sides,
-        modifiers,
-    })
-}
-
-fn parse_sides(cursor: &mut Cursor) -> Result<Sides, Box<dyn Error>> {
-    match cursor.bump() {
-        Some(Token::Int(value)) => Ok(Sides::Expr(Box::new(Expr::Int(value)))),
-        Some(Token::Float(_)) => Err("Cannot use float for number of sides".into()),
-        Some(Token::OpenBracket) => {
-            let value = parse_expr(cursor)?;
-
-            if !matches!(
-                (cursor.first(), cursor.second()),
-                (Some(Token::Comma), Some(_)) | (Some(Token::Dot), Some(Token::Dot))
-            ) {
-                return Err("Expected ',' or '..'".into());
-            }
-
-            match cursor.bump() {
-                Some(Token::Comma) => {
-                    let mut values = vec![value];
-
-                    while cursor.first() != Some(Token::Comma) {
-                        values.push(parse_expr(cursor)?);
-                    }
-
-                    cursor.expect(Token::CloseBracket)?;
-
-                    Ok(Sides::Values(values))
-                }
-                Some(Token::Dot) => {
-                    cursor.bump(); // pop the second dot
-
-                    let min = value;
-                    let max = parse_expr(cursor)?;
-
-                    cursor.expect(Token::CloseBracket)?;
-
-                    Ok(Sides::Range {
-                        min: Box::new(min),
-                        max: Box::new(max),
-                    })
-                }
-                _ => Err("Expected ',' or '..'".into()),
-            }
-        }
-        Some(Token::OpenParen) => {
-            let sides = Sides::Expr(Box::new(parse_expr(cursor)?));
-            cursor.expect(Token::CloseParen)?;
-            Ok(sides)
-        }
-        Some(Token::F) => Ok(Sides::Fudge),
-        _ => Err("Expected sides expression".into()),
-    }
-}
-
-fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>> {
-    let mut modifiers = vec![];
-
-    loop {
-        match (cursor.first(), cursor.second()) {
-            (Some(Token::K), Some(Token::L)) => {
-                cursor.bump();
-                cursor.bump();
-
-                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
-                    modifiers.push(Modifier::KeepLowest(Box::new(Expr::Int(1))));
-                    continue;
-                }
-
-                let value = parse_primary(cursor)?;
-                modifiers.push(Modifier::KeepLowest(Box::new(value)));
-            }
-            (Some(Token::K), _) => {
-                cursor.bump();
-
-                if cursor.first() != Some(Token::H) {
-                    cursor.bump();
-                }
-
-                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
-                    modifiers.push(Modifier::KeepHighest(Box::new(Expr::Int(1))));
-                    continue;
-                }
-
-                let value = parse_primary(cursor)?;
-                modifiers.push(Modifier::KeepHighest(Box::new(value)));
-            }
-            (Some(Token::D), Some(Token::H)) => {
-                cursor.bump();
-                cursor.bump();
-
-                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
-                    modifiers.push(Modifier::DropHighest(Box::new(Expr::Int(1))));
-                    continue;
-                }
-
-                let value = parse_primary(cursor)?;
-                modifiers.push(Modifier::DropHighest(Box::new(value)));
-            }
-            (Some(Token::D), _) => {
-                cursor.bump();
-
-                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
-                    modifiers.push(Modifier::DropLowest(Box::new(Expr::Int(1))));
-                    continue;
-                }
-
-                let value = parse_primary(cursor)?;
-                modifiers.push(Modifier::DropLowest(Box::new(value)));
-            }
-            (Some(Token::R), _) => {
-                cursor.bump();
-
-                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
-                    modifiers.push(Modifier::Reroll(Box::new(Expr::Int(1))));
-                    continue;
-                }
-
-                let value = parse_primary(cursor)?;
-                modifiers.push(Modifier::Reroll(Box::new(value)));
-            }
-            (Some(Token::Exclamation), _) => {
-                cursor.bump();
-
-                if !matches!(cursor.first(), Some(Token::Int(_) | Token::OpenParen)) {
-                    modifiers.push(Modifier::Explode(Box::new(Expr::Int(1))));
-                    continue;
-                }
-
-                let value = parse_primary(cursor)?;
-                modifiers.push(Modifier::Explode(Box::new(value)));
-            }
-            _ => break,
-        }
-    }
-
-    Ok(modifiers)
+    roll_parser::parse(rolls, cursor)
 }
 
 fn parse_primary(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
@@ -324,6 +183,37 @@ pub enum Modifier {
     KeepLowest(Box<Expr>),
     DropHighest(Box<Expr>),
     DropLowest(Box<Expr>),
-    Reroll(Box<Expr>),
-    Explode(Box<Expr>),
+    Reroll {
+        amount: Box<Expr>,
+        condition: Option<Condition>,
+    },
+    Explode {
+        amount: Box<Expr>,
+        condition: Option<Condition>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct Condition {
+    pub operator: RelOp,
+    pub value: Box<Expr>,
+}
+
+impl Condition {
+    pub fn new(operator: RelOp, value: Expr) -> Self {
+        Self {
+            operator,
+            value: Box::new(value),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum RelOp {
+    Equals,
+    NotEquals,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
 }
