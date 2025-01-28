@@ -1,10 +1,16 @@
+mod mode;
+
 use std::error::Error;
 
+use mode::Mode;
 use rand::Rng;
 
-use crate::parser::{BinOp, Condition, Expr, Modifier, RelOp, Sides};
+use crate::{
+    cli::Cli,
+    parser::{BinOp, Condition, Expr, Modifier, RelOp, Sides},
+};
 
-pub fn eval(tree: &Expr) -> Result<EvalResult, Box<dyn std::error::Error>> {
+pub fn eval(tree: &Expr, cli: &Cli) -> Result<EvalResult, Box<dyn std::error::Error>> {
     match tree {
         Expr::Int(v) => Ok(EvalResult {
             result: *v as f64,
@@ -20,17 +26,17 @@ pub fn eval(tree: &Expr) -> Result<EvalResult, Box<dyn std::error::Error>> {
             left,
             operator,
             right,
-        } => eval_additive(left, operator, right),
+        } => eval_additive(left, operator, right, cli),
         Expr::Multiplicative {
             left,
             operator,
             right,
-        } => eval_multiplicative(left, operator, right),
+        } => eval_multiplicative(left, operator, right, cli),
         Expr::Roll {
             rolls,
             sides,
             modifiers,
-        } => eval_roll(rolls, sides, modifiers),
+        } => eval_roll(rolls, sides, modifiers, cli),
     }
 }
 
@@ -38,18 +44,19 @@ fn eval_additive(
     left: &Expr,
     operator: &BinOp,
     right: &Expr,
+    cli: &Cli,
 ) -> Result<EvalResult, Box<dyn std::error::Error>> {
     let EvalResult {
         result: left,
         explanation: left_explanation,
         ..
-    } = eval(left)?;
+    } = eval(left, cli)?;
 
     let EvalResult {
         result: right,
         explanation: right_explanation,
         ..
-    } = eval(right)?;
+    } = eval(right, cli)?;
 
     Ok(EvalResult {
         result: match operator {
@@ -66,18 +73,19 @@ fn eval_multiplicative(
     left: &Expr,
     operator: &BinOp,
     right: &Expr,
+    cli: &Cli,
 ) -> Result<EvalResult, Box<dyn std::error::Error>> {
     let EvalResult {
         result: left,
         explanation: left_explanation,
         ..
-    } = eval(left)?;
+    } = eval(left, cli)?;
 
     let EvalResult {
         result: right,
         explanation: right_explanation,
         ..
-    } = eval(right)?;
+    } = eval(right, cli)?;
 
     Ok(EvalResult {
         result: match operator {
@@ -95,12 +103,13 @@ fn eval_roll(
     rolls: &Expr,
     sides: &Sides,
     modifiers: &Vec<Modifier>,
+    cli: &Cli,
 ) -> Result<EvalResult, Box<dyn std::error::Error>> {
     let EvalResult {
         result,
         explanation: rolls_explanation,
         is_roll: rolls_explanation_is_roll,
-    } = eval(rolls)?;
+    } = eval(rolls, cli)?;
 
     let rolls = result.round() as i64;
 
@@ -115,7 +124,7 @@ fn eval_roll(
                     result,
                     explanation,
                     is_roll,
-                } = eval(expr)?;
+                } = eval(expr, cli)?;
 
                 (
                     (1..result.round() as i64 + 1).collect(),
@@ -129,7 +138,7 @@ fn eval_roll(
                     result: min,
                     explanation: min_explanation,
                     ..
-                } = eval(min)?;
+                } = eval(min, cli)?;
 
                 let min = min.round() as i64;
 
@@ -137,7 +146,7 @@ fn eval_roll(
                     result: max,
                     explanation: max_explanation,
                     ..
-                } = eval(max)?;
+                } = eval(max, cli)?;
 
                 let max = max.round() as i64;
 
@@ -156,7 +165,7 @@ fn eval_roll(
                         result,
                         explanation,
                         ..
-                    } = eval(value)?;
+                    } = eval(value, cli)?;
 
                     results.push((result.round() as i64, explanation));
                 }
@@ -176,24 +185,14 @@ fn eval_roll(
             Sides::Fudge => ((-1..=1).collect(), "f".to_string(), false, true),
         };
 
-    let mut rng = rand::thread_rng();
-    let mut results = vec![];
+    let mut results = cli.mode.eval(rolls, &side_values)?;
 
-    for _ in 0..rolls {
-        let len = side_values.len();
-
-        if len == 0 {
-            continue;
-        }
-
-        let index = rng.gen_range(0..len);
-        results.push(DiceRolls::new(side_values[index], side_values.clone()));
-    }
+    let rng = &mut rand::thread_rng();
 
     for modifier in modifiers {
         match modifier {
             Modifier::KeepHighest(expr) => {
-                let EvalResult { result, .. } = eval(expr)?;
+                let EvalResult { result, .. } = eval(expr, cli)?;
 
                 let value = result.round() as i64;
 
@@ -214,7 +213,7 @@ fn eval_roll(
                 results.reverse();
             }
             Modifier::KeepLowest(expr) => {
-                let EvalResult { result, .. } = eval(expr)?;
+                let EvalResult { result, .. } = eval(expr, cli)?;
 
                 let value = result.round() as i64;
 
@@ -233,7 +232,7 @@ fn eval_roll(
                 }
             }
             Modifier::DropHighest(expr) => {
-                let EvalResult { result, .. } = eval(expr)?;
+                let EvalResult { result, .. } = eval(expr, cli)?;
 
                 let value = result.round() as i64;
 
@@ -250,7 +249,7 @@ fn eval_roll(
                 (0..value as usize).for_each(|i| results[i].drop());
             }
             Modifier::DropLowest(expr) => {
-                let EvalResult { result, .. } = eval(expr)?;
+                let EvalResult { result, .. } = eval(expr, cli)?;
 
                 let value = result.round() as i64;
 
@@ -269,7 +268,7 @@ fn eval_roll(
                 results.reverse();
             }
             Modifier::Reroll { amount, condition } => {
-                let EvalResult { result, .. } = eval(amount)?;
+                let EvalResult { result, .. } = eval(amount, cli)?;
 
                 let value = result.round() as i64;
 
@@ -280,7 +279,7 @@ fn eval_roll(
                 let condition = if let Some(c) = condition {
                     let Condition { operator, value } = c;
 
-                    Some((operator, eval(value)?))
+                    Some((operator, eval(value, cli)?))
                 } else {
                     None
                 };
@@ -307,7 +306,7 @@ fn eval_roll(
                 }
             }
             Modifier::Explode { amount, condition } => {
-                let EvalResult { result, .. } = eval(amount)?;
+                let EvalResult { result, .. } = eval(amount, cli)?;
 
                 let value = result.round() as i64;
 
@@ -318,7 +317,7 @@ fn eval_roll(
                 let condition = if let Some(c) = condition {
                     let Condition { operator, value } = c;
 
-                    Some((operator, eval(value)?))
+                    Some((operator, eval(value, cli)?))
                 } else {
                     None
                 };

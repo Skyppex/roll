@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     let reader = get_reader(cli.source.as_deref())?;
     let writer = get_writer(cli.destination.as_deref())?;
 
-    match program::run(reader, writer, cli.clone()) {
+    match program::run(reader, writer, &cli) {
         Ok(_) => {}
         Err(e) => cli.quiet(|| eprintln!("{}", e)),
     }
