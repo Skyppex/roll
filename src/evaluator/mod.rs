@@ -204,7 +204,7 @@ fn eval_roll(
                     return Err("Cannot keep more dice than rolled".into());
                 }
 
-                results.sort_by_key(|a| a.sum());
+                results.sort_by(|a, b| a.sum().partial_cmp(&b.sum()).expect("Cannot compare"));
 
                 for i in 0..(results.len() - value as usize) {
                     results[i].drop();
@@ -225,7 +225,7 @@ fn eval_roll(
                     return Err("Cannot keep more dice than rolled".into());
                 }
 
-                results.sort_by_key(|b| std::cmp::Reverse(b.sum()));
+                results.sort_by(|a, b| b.sum().partial_cmp(&a.sum()).expect("Cannot compare"));
 
                 for i in 0..(results.len() - value as usize) {
                     results[i].drop()
@@ -244,7 +244,7 @@ fn eval_roll(
                     return Err("Cannot drop more dice than rolled".into());
                 }
 
-                results.sort_by_key(|b| std::cmp::Reverse(b.sum()));
+                results.sort_by(|a, b| b.sum().partial_cmp(&a.sum()).expect("Cannot compare"));
 
                 (0..value as usize).for_each(|i| results[i].drop());
             }
@@ -261,7 +261,7 @@ fn eval_roll(
                     return Err("Cannot drop more dice than rolled".into());
                 }
 
-                results.sort_by_key(|a| a.sum());
+                results.sort_by(|a, b| a.sum().partial_cmp(&b.sum()).expect("Cannot compare"));
 
                 (0..value as usize).for_each(|i| results[i].drop());
 
@@ -290,7 +290,7 @@ fn eval_roll(
                             if !rel_op_eval(operator, result, condition_value)? {
                                 continue;
                             }
-                        } else if result.sum() != result.min_side() {
+                        } else if result.sum() > result.min_side() as f64 {
                             continue;
                         }
 
@@ -301,7 +301,7 @@ fn eval_roll(
                         }
 
                         let index = rng.gen_range(0..len);
-                        result.reroll(side_values[index]);
+                        result.reroll(side_values[index] as f64);
                     }
                 }
             }
@@ -328,7 +328,7 @@ fn eval_roll(
                             if !rel_op_eval(operator, result, condition_value)? {
                                 continue;
                             }
-                        } else if result.last() != result.max_side() {
+                        } else if result.last() < result.max_side() as f64 {
                             continue;
                         }
 
@@ -339,7 +339,7 @@ fn eval_roll(
                         }
 
                         let index = rng.gen_range(0..len);
-                        result.explode(side_values[index]);
+                        result.explode(side_values[index] as f64);
                     }
                 }
             }
@@ -373,7 +373,7 @@ fn eval_roll(
     };
 
     Ok(EvalResult {
-        result: results.iter().map(|r| r.sum()).sum::<i64>() as f64,
+        result: results.iter().map(|r| r.sum()).sum::<f64>(),
         explanation,
         is_roll: true,
     })
@@ -397,7 +397,7 @@ fn rel_op_eval(
     left: &DiceRolls,
     right: &EvalResult,
 ) -> Result<bool, Box<dyn Error>> {
-    let left = left.last() as f64;
+    let left = left.last();
     let right = right.result;
 
     Ok(match operator {
@@ -419,12 +419,12 @@ pub struct EvalResult {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiceRoll {
-    pub value: i64,
+    pub value: f64,
     modification: Option<Modification>,
 }
 
 impl DiceRoll {
-    fn new(value: i64) -> Self {
+    fn new(value: f64) -> Self {
         Self {
             value,
             modification: None,
@@ -459,7 +459,7 @@ pub struct DiceRolls {
 }
 
 impl DiceRolls {
-    fn new(value: i64, sides: Vec<i64>) -> Self {
+    fn new(value: f64, sides: Vec<i64>) -> Self {
         Self {
             values: vec![DiceRoll::new(value)],
             sides,
@@ -467,7 +467,7 @@ impl DiceRolls {
         }
     }
 
-    fn add_value(&mut self, value: i64) {
+    fn add_value(&mut self, value: f64) {
         self.values.push(DiceRoll::new(value));
     }
 
@@ -479,7 +479,7 @@ impl DiceRolls {
         self.modification = Some(Modification::Dropped)
     }
 
-    fn reroll(&mut self, new_roll: i64) {
+    fn reroll(&mut self, new_roll: f64) {
         if let Some(last) = self.values.iter_mut().last() {
             last.modify_mut(Modification::Rerolled);
         }
@@ -487,7 +487,7 @@ impl DiceRolls {
         self.add_value(new_roll);
     }
 
-    fn explode(&mut self, new_roll: i64) {
+    fn explode(&mut self, new_roll: f64) {
         if let Some(last) = self.values.iter_mut().last() {
             last.modify_mut(Modification::Exploded);
         }
@@ -517,7 +517,7 @@ impl DiceRolls {
         matches!(&self.modification, None | Some(Modification::Exploded))
     }
 
-    fn sum(&self) -> i64 {
+    fn sum(&self) -> f64 {
         if self.count_roll() {
             self.values
                 .iter()
@@ -525,11 +525,11 @@ impl DiceRolls {
                 .map(|v| v.value)
                 .sum()
         } else {
-            0
+            0.0
         }
     }
 
-    fn last(&self) -> i64 {
+    fn last(&self) -> f64 {
         self.values.last().expect("No values").value
     }
 
