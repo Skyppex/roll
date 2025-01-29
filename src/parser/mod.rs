@@ -3,19 +3,19 @@ mod roll_parser;
 
 pub use cursor::Cursor;
 
-use std::{error::Error, fmt::Display};
+use std::fmt::Display;
 
-use crate::lexer::Token;
+use crate::{lexer::Token, program::DynError};
 
-pub fn parse(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+pub fn parse(cursor: &mut Cursor) -> Result<Expr, DynError> {
     parse_expr(cursor)
 }
 
-fn parse_expr(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+fn parse_expr(cursor: &mut Cursor) -> Result<Expr, DynError> {
     parse_additive(cursor)
 }
 
-fn parse_additive(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+fn parse_additive(cursor: &mut Cursor) -> Result<Expr, DynError> {
     let mut expr = parse_multiplicative(cursor)?;
 
     while let Some(token) = cursor.first() {
@@ -47,7 +47,7 @@ fn parse_additive(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
     Ok(expr)
 }
 
-fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expr, DynError> {
     let mut expr = parse_roll(cursor)?;
 
     while let Some(token) = cursor.first() {
@@ -89,7 +89,7 @@ fn parse_multiplicative(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
     Ok(expr)
 }
 
-fn parse_roll(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+fn parse_roll(cursor: &mut Cursor) -> Result<Expr, DynError> {
     let rolls = if cursor.first() != Some(Token::D) {
         Some(parse_primary(cursor)?)
     } else {
@@ -112,7 +112,7 @@ fn parse_roll(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
     roll_parser::parse(rolls, cursor)
 }
 
-fn parse_primary(cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+fn parse_primary(cursor: &mut Cursor) -> Result<Expr, DynError> {
     match cursor.bump() {
         Some(Token::Int(value)) => Ok(Expr::Int(value)),
         Some(Token::Float(value)) => Ok(Expr::Float(value)),

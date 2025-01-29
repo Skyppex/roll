@@ -1,4 +1,6 @@
-pub fn tokenize(expression: &str) -> Result<Vec<Token>, Box<dyn std::error::Error>> {
+use crate::program::DynError;
+
+pub fn tokenize(expression: &str) -> Result<Vec<Token>, DynError> {
     let mut tokens = Vec::new();
     let mut chars = expression.chars().peekable();
 

@@ -1,10 +1,8 @@
-use std::error::Error;
-
-use crate::lexer::Token;
+use crate::{lexer::Token, program::DynError};
 
 use super::{cursor::Cursor, parse_expr, parse_primary, Condition, Expr, Modifier, RelOp, Sides};
 
-pub fn parse(rolls: Expr, cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
+pub fn parse(rolls: Expr, cursor: &mut Cursor) -> Result<Expr, DynError> {
     let sides = parse_sides(cursor)?;
     let modifiers = parse_modifiers(cursor)?;
 
@@ -15,7 +13,7 @@ pub fn parse(rolls: Expr, cursor: &mut Cursor) -> Result<Expr, Box<dyn Error>> {
     })
 }
 
-fn parse_sides(cursor: &mut Cursor) -> Result<Sides, Box<dyn Error>> {
+fn parse_sides(cursor: &mut Cursor) -> Result<Sides, DynError> {
     match cursor.bump() {
         Some(Token::Int(value)) => Ok(Sides::Expr(Box::new(Expr::Int(value)))),
         Some(Token::Float(_)) => Err("Cannot use float for number of sides".into()),
@@ -67,7 +65,7 @@ fn parse_sides(cursor: &mut Cursor) -> Result<Sides, Box<dyn Error>> {
     }
 }
 
-fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>> {
+fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, DynError> {
     let mut modifiers = vec![];
 
     loop {
@@ -161,7 +159,7 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, Box<dyn Error>>
     Ok(modifiers)
 }
 
-fn parse_condition(cursor: &mut Cursor) -> Result<Option<Condition>, Box<dyn Error>> {
+fn parse_condition(cursor: &mut Cursor) -> Result<Option<Condition>, DynError> {
     match (cursor.first(), cursor.second()) {
         (Some(Token::Less), Some(Token::Equals)) => {
             cursor.bump();

@@ -1,15 +1,15 @@
 use rand::Rng;
 
-use crate::cli;
+use crate::{cli, program::DynError};
 
 use super::DiceRolls;
 
 pub trait Mode {
-    fn eval(&self, rolls: i64, side_values: &[i64]) -> Result<Vec<DiceRolls>, String>;
+    fn eval(&self, rolls: i64, side_values: &[i64]) -> Result<Vec<DiceRolls>, DynError>;
 }
 
 impl Mode for Option<cli::Mode> {
-    fn eval(&self, rolls: i64, side_values: &[i64]) -> Result<Vec<DiceRolls>, String> {
+    fn eval(&self, rolls: i64, side_values: &[i64]) -> Result<Vec<DiceRolls>, DynError> {
         match self {
             None => {
                 let mut rng = rand::thread_rng();

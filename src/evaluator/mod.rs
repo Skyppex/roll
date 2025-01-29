@@ -1,16 +1,15 @@
 mod mode;
 
-use std::error::Error;
-
 use mode::Mode;
 use rand::Rng;
 
 use crate::{
     cli::Cli,
     parser::{BinOp, Condition, Expr, Modifier, RelOp, Sides},
+    program::DynError,
 };
 
-pub fn eval(tree: &Expr, cli: &Cli) -> Result<EvalResult, Box<dyn std::error::Error>> {
+pub fn eval(tree: &Expr, cli: &Cli) -> Result<EvalResult, DynError> {
     match tree {
         Expr::Int(v) => Ok(EvalResult {
             result: *v as f64,
@@ -45,7 +44,7 @@ fn eval_additive(
     operator: &BinOp,
     right: &Expr,
     cli: &Cli,
-) -> Result<EvalResult, Box<dyn std::error::Error>> {
+) -> Result<EvalResult, DynError> {
     let EvalResult {
         result: left,
         explanation: left_explanation,
@@ -74,7 +73,7 @@ fn eval_multiplicative(
     operator: &BinOp,
     right: &Expr,
     cli: &Cli,
-) -> Result<EvalResult, Box<dyn std::error::Error>> {
+) -> Result<EvalResult, DynError> {
     let EvalResult {
         result: left,
         explanation: left_explanation,
@@ -104,7 +103,7 @@ fn eval_roll(
     sides: &Sides,
     modifiers: &Vec<Modifier>,
     cli: &Cli,
-) -> Result<EvalResult, Box<dyn std::error::Error>> {
+) -> Result<EvalResult, DynError> {
     let EvalResult {
         result,
         explanation: rolls_explanation,
@@ -379,7 +378,7 @@ fn eval_roll(
     })
 }
 
-fn to_fudge(roll_str: &str, is_fudge: bool) -> Result<String, Box<dyn Error>> {
+fn to_fudge(roll_str: &str, is_fudge: bool) -> Result<String, DynError> {
     if !is_fudge {
         return Ok(roll_str.to_string());
     }
@@ -392,11 +391,7 @@ fn to_fudge(roll_str: &str, is_fudge: bool) -> Result<String, Box<dyn Error>> {
     }
 }
 
-fn rel_op_eval(
-    operator: &RelOp,
-    left: &DiceRolls,
-    right: &EvalResult,
-) -> Result<bool, Box<dyn Error>> {
+fn rel_op_eval(operator: &RelOp, left: &DiceRolls, right: &EvalResult) -> Result<bool, DynError> {
     let left = left.last();
     let right = right.result;
 
