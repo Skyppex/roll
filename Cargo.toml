@@ -9,4 +9,6 @@ edition = "2021"
 atty = "0.2.14"
 clap = { version = "4.5.4", features = ["derive"] }
 dirs = "5.0.1"
+indicatif = "0.17.11"
 rand = "0.8.5"
+rayon = "1.10.0"
