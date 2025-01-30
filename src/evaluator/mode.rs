@@ -125,7 +125,10 @@ impl Mode for Option<cli::Mode> {
                 }
 
                 Ok(vec![DiceRolls::new(
-                    evals.iter().map(|v| avg(v)).sum::<f64>() / *v as f64,
+                    avg(&evals
+                        .iter()
+                        .map(|rolls| rolls.iter().sum::<f64>())
+                        .collect::<Vec<_>>()),
                     side_values.to_vec(),
                 )])
             }
