@@ -1,11 +1,10 @@
 mod mode;
 
 use mode::Mode;
-use rand::Rng;
 
 use crate::{
     cli::Cli,
-    parser::{BinOp, Condition, Expr, Modifier, RelOp, Sides},
+    parser::{BinOp, Expr, Modifier, Sides},
     program::DynError,
 };
 
@@ -101,7 +100,7 @@ fn eval_multiplicative(
 fn eval_roll(
     rolls: &Expr,
     sides: &Sides,
-    modifiers: &Vec<Modifier>,
+    modifiers: &[Modifier],
     cli: &Cli,
 ) -> Result<EvalResult, DynError> {
     let EvalResult {
@@ -184,166 +183,7 @@ fn eval_roll(
             Sides::Fudge => ((-1..=1).collect(), "f".to_string(), false, true),
         };
 
-    let mut results = cli.mode.eval(rolls, &side_values)?;
-
-    let rng = &mut rand::thread_rng();
-
-    for modifier in modifiers {
-        match modifier {
-            Modifier::KeepHighest(expr) => {
-                let EvalResult { result, .. } = eval(expr, cli)?;
-
-                let value = result.round() as i64;
-
-                if value < 0 {
-                    return Err("Cannot keep a negative number of dice".into());
-                }
-
-                if value > rolls {
-                    return Err("Cannot keep more dice than rolled".into());
-                }
-
-                results.sort_by(|a, b| a.sum().partial_cmp(&b.sum()).expect("Cannot compare"));
-
-                for i in 0..(results.len() - value as usize) {
-                    results[i].drop();
-                }
-
-                results.reverse();
-            }
-            Modifier::KeepLowest(expr) => {
-                let EvalResult { result, .. } = eval(expr, cli)?;
-
-                let value = result.round() as i64;
-
-                if value < 0 {
-                    return Err("Cannot keep a negative number of dice".into());
-                }
-
-                if value > rolls {
-                    return Err("Cannot keep more dice than rolled".into());
-                }
-
-                results.sort_by(|a, b| b.sum().partial_cmp(&a.sum()).expect("Cannot compare"));
-
-                for i in 0..(results.len() - value as usize) {
-                    results[i].drop()
-                }
-            }
-            Modifier::DropHighest(expr) => {
-                let EvalResult { result, .. } = eval(expr, cli)?;
-
-                let value = result.round() as i64;
-
-                if value < 0 {
-                    return Err("Cannot drop a negative number of dice".into());
-                }
-
-                if value > rolls {
-                    return Err("Cannot drop more dice than rolled".into());
-                }
-
-                results.sort_by(|a, b| b.sum().partial_cmp(&a.sum()).expect("Cannot compare"));
-
-                (0..value as usize).for_each(|i| results[i].drop());
-            }
-            Modifier::DropLowest(expr) => {
-                let EvalResult { result, .. } = eval(expr, cli)?;
-
-                let value = result.round() as i64;
-
-                if value < 0 {
-                    return Err("Cannot drop a negative number of dice".into());
-                }
-
-                if value > rolls {
-                    return Err("Cannot drop more dice than rolled".into());
-                }
-
-                results.sort_by(|a, b| a.sum().partial_cmp(&b.sum()).expect("Cannot compare"));
-
-                (0..value as usize).for_each(|i| results[i].drop());
-
-                results.reverse();
-            }
-            Modifier::Reroll { amount, condition } => {
-                let EvalResult { result, .. } = eval(amount, cli)?;
-
-                let value = result.round() as i64;
-
-                if value < 0 {
-                    return Err("Cannot reroll a negative number of times".into());
-                }
-
-                let condition = if let Some(c) = condition {
-                    let Condition { operator, value } = c;
-
-                    Some((operator, eval(value, cli)?))
-                } else {
-                    None
-                };
-
-                for result in results.iter_mut() {
-                    for _ in 0..value {
-                        if let Some((operator, ref condition_value)) = condition {
-                            if !rel_op_eval(operator, result, condition_value)? {
-                                continue;
-                            }
-                        } else if result.sum() > result.min_side() as f64 {
-                            continue;
-                        }
-
-                        let len = side_values.len();
-
-                        if len == 0 {
-                            continue;
-                        }
-
-                        let index = rng.gen_range(0..len);
-                        result.reroll(side_values[index] as f64);
-                    }
-                }
-            }
-            Modifier::Explode { amount, condition } => {
-                let EvalResult { result, .. } = eval(amount, cli)?;
-
-                let value = result.round() as i64;
-
-                if value < 0 {
-                    return Err("Cannot reroll a negative number of times".into());
-                }
-
-                let condition = if let Some(c) = condition {
-                    let Condition { operator, value } = c;
-
-                    Some((operator, eval(value, cli)?))
-                } else {
-                    None
-                };
-
-                for result in results.iter_mut() {
-                    for _ in 0..value {
-                        if let Some((operator, ref condition_value)) = condition {
-                            if !rel_op_eval(operator, result, condition_value)? {
-                                continue;
-                            }
-                        } else if result.last() < result.max_side() as f64 {
-                            continue;
-                        }
-
-                        let len = side_values.len();
-
-                        if len == 0 {
-                            continue;
-                        }
-
-                        let index = rng.gen_range(0..len);
-                        result.explode(side_values[index] as f64);
-                    }
-                }
-            }
-        }
-    }
+    let results = cli.mode.eval(rolls, &side_values, modifiers, cli)?;
 
     let mut results_explanation = String::new();
 
@@ -389,20 +229,6 @@ fn to_fudge(roll_str: &str, is_fudge: bool) -> Result<String, DynError> {
         "0" => Ok("o".to_string()),
         _ => Err("Invalid fudge value".into()),
     }
-}
-
-fn rel_op_eval(operator: &RelOp, left: &DiceRolls, right: &EvalResult) -> Result<bool, DynError> {
-    let left = left.last();
-    let right = right.result;
-
-    Ok(match operator {
-        RelOp::Equals => left == right,
-        RelOp::NotEquals => left != right,
-        RelOp::Greater => left > right,
-        RelOp::GreaterEqual => left >= right,
-        RelOp::Less => left < right,
-        RelOp::LessEqual => left <= right,
-    })
 }
 
 #[derive(Debug, Clone)]

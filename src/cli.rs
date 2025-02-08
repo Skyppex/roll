@@ -59,6 +59,7 @@ impl Cli {
 
 #[derive(Debug, Clone)]
 pub enum Mode {
+    Rng,
     Avg,
     Min,
     Max,
@@ -70,11 +71,12 @@ impl FromStr for Mode {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "avg" => Ok(Self::Avg),
-            "min" => Ok(Self::Min),
-            "max" => Ok(Self::Max),
-            "med" => Ok(Self::Med),
+        match s.to_lowercase().as_str() {
+            "rng" | "rand" | "r" => Ok(Self::Rng),
+            "avg" | "a" => Ok(Self::Avg),
+            "min" | "-" => Ok(Self::Min),
+            "max" | "+" => Ok(Self::Max),
+            "med" | "m" => Ok(Self::Med),
             s if s.starts_with("simavg") => {
                 let n = s
                     .split(':')
