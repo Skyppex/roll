@@ -365,7 +365,7 @@ impl DiceRolls {
             format!("{}{}", self.values[0].explain(), modified_text)
         } else {
             format!(
-                "({}){}",
+                "{{{}}}{}",
                 self.values
                     .iter()
                     .map(|v| v.explain())
