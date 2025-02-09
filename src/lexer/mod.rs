@@ -12,7 +12,14 @@ pub fn tokenize(expression: &str) -> Result<Vec<Token>, DynError> {
             '[' => tokens.push(Token::OpenBracket),
             ']' => tokens.push(Token::CloseBracket),
             '+' => tokens.push(Token::Add),
-            '-' => tokens.push(Token::Sub),
+            '-' => {
+                if let Some('0'..='9') = chars.peek() {
+                    println!("negative number");
+                    parse_number(c, &mut chars, &mut tokens)
+                } else {
+                    tokens.push(Token::Sub);
+                }
+            }
             '*' => tokens.push(Token::Mul),
             '/' => tokens.push(Token::Div),
             '%' => tokens.push(Token::Mod),
@@ -30,34 +37,44 @@ pub fn tokenize(expression: &str) -> Result<Vec<Token>, DynError> {
             '<' => tokens.push(Token::Less),
             '~' => tokens.push(Token::Tilde),
             '0'..='9' => {
-                let mut value = c.to_string();
-
-                while let Some('0'..='9') = chars.peek() {
-                    value.push(chars.next().unwrap());
-                }
-
-                let mut clone = chars.clone();
-                let first = clone.next();
-                let second = clone.next();
-
-                #[allow(clippy::almost_complete_range)]
-                if let (Some('.'), Some('0'..'9')) = (first, second) {
-                    value.push(chars.next().unwrap());
-
-                    while let Some('0'..='9') = chars.peek() {
-                        value.push(chars.next().unwrap());
-                    }
-
-                    tokens.push(Token::Float(value.parse().unwrap()));
-                } else {
-                    tokens.push(Token::Int(value.parse().unwrap()));
-                }
+                parse_number(c, &mut chars, &mut tokens);
             }
             _ => Err(format!("Unexpected character: {}", c))?,
         }
     }
 
     Ok(tokens)
+}
+
+fn parse_number(
+    c: char,
+    chars: &mut std::iter::Peekable<std::str::Chars<'_>>,
+    tokens: &mut Vec<Token>,
+) {
+    let mut value = c.to_string();
+
+    while let Some('0'..='9') = chars.peek() {
+        value.push(chars.next().unwrap());
+    }
+
+    let mut clone = chars.clone();
+    let first = clone.next();
+    let second = clone.next();
+
+    #[allow(clippy::almost_complete_range)]
+    if let (Some('.'), Some('0'..'9')) = (first, second) {
+        value.push(chars.next().unwrap());
+
+        while let Some('0'..='9') = chars.peek() {
+            value.push(chars.next().unwrap());
+        }
+
+        let parsed = value.parse::<f64>().unwrap();
+        tokens.push(Token::Float(parsed));
+    } else {
+        let parsed = value.parse::<i64>().unwrap();
+        tokens.push(Token::Int(parsed));
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
