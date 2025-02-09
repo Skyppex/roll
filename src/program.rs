@@ -95,9 +95,9 @@ fn run_lines<R: Read, W: Write>(mut reader: R, mut writer: W, cli: &Cli) -> Resu
 
 fn format_result(result: EvalResult, cli: &Cli) -> String {
     if cli.explain {
-        format!("{:.5} : {}", result.result, result.explanation)
+        format!("{} : {}", result.result, result.explanation)
     } else {
-        format!("{:.5}", result.result)
+        format!("{}", result.result)
     }
 }
 
