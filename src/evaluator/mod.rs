@@ -3,7 +3,7 @@ mod mode;
 use mode::Mode;
 
 use crate::{
-    cli::Cli,
+    cli::{self, Cli},
     parser::{BinOp, Expr, Modifier, Sides},
     program::DynError,
 };
@@ -188,7 +188,14 @@ fn eval_roll(
     let mut results_explanation = String::new();
 
     for (i, result) in results.iter().enumerate() {
-        results_explanation.push_str(to_fudge(&result.explain(), is_fudge)?.as_str());
+        results_explanation.push_str(
+            to_fudge(
+                &result.explain(),
+                is_fudge,
+                cli.mode.as_ref().unwrap_or(&cli::Mode::Rng),
+            )
+            .as_str(),
+        );
 
         if i < results.len() - 1 {
             results_explanation.push_str(", ");
@@ -218,16 +225,16 @@ fn eval_roll(
     })
 }
 
-fn to_fudge(roll_str: &str, is_fudge: bool) -> Result<String, DynError> {
-    if !is_fudge {
-        return Ok(roll_str.to_string());
+fn to_fudge(roll_str: &str, is_fudge: bool, mode: &cli::Mode) -> String {
+    if !is_fudge || !matches!(mode, cli::Mode::Rng) {
+        return roll_str.to_string();
     }
 
     match roll_str {
-        "-1" => Ok("-".to_string()),
-        "1" => Ok("+".to_string()),
-        "0" => Ok("o".to_string()),
-        _ => Err("Invalid fudge value".into()),
+        "-1" => "-".to_string(),
+        "1" => "+".to_string(),
+        "0" => "o".to_string(),
+        other => other.to_string(),
     }
 }
 

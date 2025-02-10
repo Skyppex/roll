@@ -27,11 +27,12 @@ fn parse_sides(cursor: &mut Cursor) -> Result<Sides, DynError> {
                 return Err("Expected ',' or '..'".into());
             }
 
-            match cursor.bump() {
+            match cursor.first() {
                 Some(Token::Comma) => {
                     let mut values = vec![value];
 
-                    while cursor.first() != Some(Token::Comma) {
+                    while cursor.first() == Some(Token::Comma) {
+                        cursor.bump();
                         values.push(parse_expr(cursor)?);
                     }
 
@@ -40,7 +41,8 @@ fn parse_sides(cursor: &mut Cursor) -> Result<Sides, DynError> {
                     Ok(Sides::Values(values))
                 }
                 Some(Token::Dot) => {
-                    cursor.bump(); // pop the second dot
+                    cursor.bump(); // pop the first dot
+                    cursor.expect(Token::Dot)?; // expect the second dot
 
                     let min = value;
                     let max = parse_expr(cursor)?;
