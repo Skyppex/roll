@@ -1,4 +1,5 @@
 use rand::Rng;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
 use crate::{
     cli::{self, Cli},
@@ -209,12 +210,14 @@ fn get_roller(mode: &Option<cli::Mode>) -> Roller {
                   modifiers: &[Modifier],
                   _mode: &Option<cli::Mode>,
                   cli: &Cli| {
-                let mut evals = vec![];
-
-                for _ in 0..*v {
-                    let results = Some(cli::Mode::Rng).eval(rolls, side_values, modifiers, cli)?;
-                    evals.push(results.iter().map(|v| v.sum()).collect::<Vec<_>>());
-                }
+                let evals = (0..*v)
+                    .into_par_iter()
+                    .map(|_| -> Result<_, DynError> {
+                        let results =
+                            Some(cli::Mode::Rng).eval(rolls, side_values, modifiers, cli)?;
+                        return Ok(results.iter().map(|v| v.sum()).collect::<Vec<_>>());
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
 
                 Ok(vec![DiceRolls::new(
                     avg(&evals
@@ -342,7 +345,7 @@ fn apply_modifiers(
                             }
 
                             for i in 1..=value {
-                                let prob = explode_probability(side_values, i as u64);
+                                let prob = explode_probability(side_values, i as u64, None)?;
                                 let avg =
                                     avg(&side_values.iter().map(|v| *v as f64).collect::<Vec<_>>());
 
@@ -400,7 +403,7 @@ fn apply_modifiers(
                             }
 
                             for i in 1..=value {
-                                let prob = explode_probability(side_values, i as u64);
+                                let prob = explode_probability(side_values, i as u64, None)?;
                                 let avg =
                                     avg(&side_values.iter().map(|v| *v as f64).collect::<Vec<_>>());
 
@@ -480,15 +483,15 @@ fn explode_probability(
     let mut will_explode_count = 0;
 
     let condition = if let Some((operator, ref value)) = condition {
-        (operator, value.result)
+        Some((operator, value.result))
     } else {
         None
     };
 
-    for v in side_values {
-        if 
-    }
+    // for v in side_values {
+    //     if
+    // }
 
     let max = *side_values.iter().max().unwrap() as f64;
-    1f64 / max.powf(depth as f64)
+    Ok(1f64 / max.powf(depth as f64))
 }
