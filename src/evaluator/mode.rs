@@ -333,23 +333,43 @@ fn apply_modifiers(
                 };
 
                 for result in results.iter_mut() {
-                    for _ in 0..value {
-                        if let Some((operator, ref condition_value)) = condition {
-                            if !rel_op_eval(operator, result, condition_value)? {
+                    match mode {
+                        Some(cli::Mode::Avg) => {
+                            let len = side_values.len();
+
+                            if len == 0 {
                                 continue;
                             }
-                        } else if result.sum() > result.min_side() as f64 {
-                            continue;
+
+                            for i in 1..=value {
+                                let prob = explode_probability(side_values, i as u64);
+                                let avg =
+                                    avg(&side_values.iter().map(|v| *v as f64).collect::<Vec<_>>());
+
+                                let new_roll = prob * avg;
+                                result.explode(new_roll);
+                            }
                         }
+                        _ => {
+                            for _ in 0..value {
+                                if let Some((operator, ref condition_value)) = condition {
+                                    if !rel_op_eval(operator, result, condition_value)? {
+                                        continue;
+                                    }
+                                } else if result.sum() > result.min_side() as f64 {
+                                    continue;
+                                }
 
-                        let len = side_values.len();
+                                let len = side_values.len();
 
-                        if len == 0 {
-                            continue;
+                                if len == 0 {
+                                    continue;
+                                }
+
+                                let new_roll = roller(1, side_values, &[], mode, cli)?;
+                                result.reroll(new_roll.iter().map(|r| r.sum()).sum());
+                            }
                         }
-
-                        let new_roll = roller(1, side_values, &[], mode, cli)?;
-                        result.reroll(new_roll.iter().map(|r| r.sum()).sum());
                     }
                 }
             }
@@ -371,23 +391,43 @@ fn apply_modifiers(
                 };
 
                 for result in results.iter_mut() {
-                    for _ in 0..value {
-                        if let Some((operator, ref condition_value)) = condition {
-                            if !rel_op_eval(operator, result, condition_value)? {
+                    match mode {
+                        Some(cli::Mode::Avg) => {
+                            let len = side_values.len();
+
+                            if len == 0 {
                                 continue;
                             }
-                        } else if result.last() < result.max_side() as f64 {
-                            continue;
+
+                            for i in 1..=value {
+                                let prob = explode_probability(side_values, i as u64);
+                                let avg =
+                                    avg(&side_values.iter().map(|v| *v as f64).collect::<Vec<_>>());
+
+                                let new_roll = prob * avg;
+                                result.explode(new_roll);
+                            }
                         }
+                        _ => {
+                            for _ in 0..value {
+                                if let Some((operator, ref condition_value)) = condition {
+                                    if !rel_op_eval(operator, result, condition_value)? {
+                                        continue;
+                                    }
+                                } else if result.last() < result.max_side() as f64 {
+                                    continue;
+                                }
 
-                        let len = side_values.len();
+                                let len = side_values.len();
 
-                        if len == 0 {
-                            continue;
+                                if len == 0 {
+                                    continue;
+                                }
+
+                                let new_roll = roller(1, side_values, &[], mode, cli)?;
+                                result.explode(new_roll.iter().map(|r| r.sum()).sum());
+                            }
                         }
-
-                        let new_roll = roller(1, side_values, &[], mode, cli)?;
-                        result.explode(new_roll.iter().map(|r| r.sum()).sum());
                     }
                 }
             }
@@ -429,4 +469,26 @@ fn rel_op_eval(operator: &RelOp, left: &DiceRolls, right: &EvalResult) -> Result
         RelOp::Less => left < right,
         RelOp::LessEqual => left <= right,
     })
+}
+
+fn explode_probability(
+    side_values: &[i64],
+    depth: u64,
+    condition: Option<(&RelOp, EvalResult)>,
+) -> Result<f64, DynError> {
+    let len = side_values.len();
+    let mut will_explode_count = 0;
+
+    let condition = if let Some((operator, ref value)) = condition {
+        (operator, value.result)
+    } else {
+        None
+    };
+
+    for v in side_values {
+        if 
+    }
+
+    let max = *side_values.iter().max().unwrap() as f64;
+    1f64 / max.powf(depth as f64)
 }
