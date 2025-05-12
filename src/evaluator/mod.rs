@@ -219,7 +219,10 @@ fn eval_roll(
     };
 
     Ok(EvalResult {
-        result: results.iter().map(|r| r.sum()).sum::<f64>(),
+        result: results
+            .iter()
+            .map(|r| r.sum(cli.mode.as_ref()))
+            .sum::<f64>(),
         explanation,
         is_roll: true,
     })
@@ -259,12 +262,16 @@ impl DiceRoll {
         }
     }
 
-    fn modify_mut(&mut self, modification: Modification) {
+    fn modify(&mut self, modification: Modification) {
         self.modification = Some(modification);
     }
 
-    fn count_roll(&self) -> bool {
-        matches!(&self.modification, None | Some(Modification::Exploded))
+    fn count_roll(&self, mode: Option<&cli::Mode>) -> bool {
+        matches!(
+            (mode.unwrap_or(&cli::Mode::Rng), &self.modification),
+            (cli::Mode::Avg, Some(Modification::Rerolled))
+                | (_, None | Some(Modification::Exploded))
+        )
     }
 
     fn explain(&self) -> String {
@@ -309,7 +316,7 @@ impl DiceRolls {
 
     fn reroll(&mut self, new_roll: f64) {
         if let Some(last) = self.values.iter_mut().last() {
-            last.modify_mut(Modification::Rerolled);
+            last.modify(Modification::Rerolled);
         }
 
         self.add_value(new_roll);
@@ -317,7 +324,7 @@ impl DiceRolls {
 
     fn explode(&mut self, new_roll: f64) {
         if let Some(last) = self.values.iter_mut().last() {
-            last.modify_mut(Modification::Exploded);
+            last.modify(Modification::Exploded);
         }
 
         self.add_value(new_roll);
@@ -341,15 +348,19 @@ impl DiceRolls {
     //         * self.values.iter().filter(|v| v.count_roll()).count() as i64
     // }
 
-    fn count_roll(&self) -> bool {
-        matches!(&self.modification, None | Some(Modification::Exploded))
+    fn count_roll(&self, mode: Option<&cli::Mode>) -> bool {
+        matches!(
+            (mode.unwrap_or(&cli::Mode::Rng), &self.modification),
+            (cli::Mode::Avg, Some(Modification::Rerolled))
+                | (_, None | Some(Modification::Exploded))
+        )
     }
 
-    fn sum(&self) -> f64 {
-        if self.count_roll() {
+    fn sum(&self, mode: Option<&cli::Mode>) -> f64 {
+        if self.count_roll(mode) {
             self.values
                 .iter()
-                .filter(|v| v.count_roll())
+                .filter(|v| v.count_roll(mode))
                 .map(|v| v.value)
                 .sum()
         } else {

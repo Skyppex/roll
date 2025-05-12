@@ -213,9 +213,11 @@ fn get_roller(mode: &Option<cli::Mode>) -> Roller {
                 let evals = (0..*v)
                     .into_par_iter()
                     .map(|_| -> Result<_, DynError> {
-                        let results =
-                            Some(cli::Mode::Rng).eval(rolls, side_values, modifiers, cli)?;
-                        return Ok(results.iter().map(|v| v.sum()).collect::<Vec<_>>());
+                        Ok(Some(cli::Mode::Rng)
+                            .eval(rolls, side_values, modifiers, cli)?
+                            .iter()
+                            .map(|v| v.sum(cli.mode.as_ref()))
+                            .collect::<Vec<_>>())
                     })
                     .collect::<Result<Vec<_>, _>>()?;
 
@@ -255,7 +257,11 @@ fn apply_modifiers(
                     return Err("Cannot keep more dice than rolled".into());
                 }
 
-                results.sort_by(|a, b| a.sum().partial_cmp(&b.sum()).expect("Cannot compare"));
+                results.sort_by(|a, b| {
+                    a.sum(cli.mode.as_ref())
+                        .partial_cmp(&b.sum(cli.mode.as_ref()))
+                        .expect("Cannot compare")
+                });
 
                 for i in 0..(results.len() - value as usize) {
                     results[i].drop();
@@ -276,7 +282,11 @@ fn apply_modifiers(
                     return Err("Cannot keep more dice than rolled".into());
                 }
 
-                results.sort_by(|a, b| b.sum().partial_cmp(&a.sum()).expect("Cannot compare"));
+                results.sort_by(|a, b| {
+                    b.sum(cli.mode.as_ref())
+                        .partial_cmp(&a.sum(cli.mode.as_ref()))
+                        .expect("Cannot compare")
+                });
 
                 for i in 0..(results.len() - value as usize) {
                     results[i].drop()
@@ -295,7 +305,11 @@ fn apply_modifiers(
                     return Err("Cannot drop more dice than rolled".into());
                 }
 
-                results.sort_by(|a, b| b.sum().partial_cmp(&a.sum()).expect("Cannot compare"));
+                results.sort_by(|a, b| {
+                    b.sum(cli.mode.as_ref())
+                        .partial_cmp(&a.sum(cli.mode.as_ref()))
+                        .expect("Cannot compare")
+                });
 
                 (0..value as usize).for_each(|i| results[i].drop());
             }
@@ -312,7 +326,11 @@ fn apply_modifiers(
                     return Err("Cannot drop more dice than rolled".into());
                 }
 
-                results.sort_by(|a, b| a.sum().partial_cmp(&b.sum()).expect("Cannot compare"));
+                results.sort_by(|a, b| {
+                    a.sum(cli.mode.as_ref())
+                        .partial_cmp(&b.sum(cli.mode.as_ref()))
+                        .expect("Cannot compare")
+                });
 
                 (0..value as usize).for_each(|i| results[i].drop());
 
@@ -344,13 +362,15 @@ fn apply_modifiers(
                                 continue;
                             }
 
+                            let avg =
+                                avg(&side_values.iter().map(|v| *v as f64).collect::<Vec<_>>());
+
                             for i in 1..=value {
-                                let prob = explode_probability(side_values, i as u64, None)?;
-                                let avg =
-                                    avg(&side_values.iter().map(|v| *v as f64).collect::<Vec<_>>());
+                                let prob =
+                                    reroll_probability(side_values, i as u64, condition.clone())?;
 
                                 let new_roll = prob * avg;
-                                result.explode(new_roll);
+                                result.reroll(new_roll);
                             }
                         }
                         _ => {
@@ -359,7 +379,7 @@ fn apply_modifiers(
                                     if !rel_op_eval(operator, result, condition_value)? {
                                         continue;
                                     }
-                                } else if result.sum() > result.min_side() as f64 {
+                                } else if result.sum(cli.mode.as_ref()) > result.min_side() as f64 {
                                     continue;
                                 }
 
@@ -370,7 +390,9 @@ fn apply_modifiers(
                                 }
 
                                 let new_roll = roller(1, side_values, &[], mode, cli)?;
-                                result.reroll(new_roll.iter().map(|r| r.sum()).sum());
+                                result.reroll(
+                                    new_roll.iter().map(|r| r.sum(cli.mode.as_ref())).sum(),
+                                );
                             }
                         }
                     }
@@ -402,10 +424,12 @@ fn apply_modifiers(
                                 continue;
                             }
 
+                            let avg =
+                                avg(&side_values.iter().map(|v| *v as f64).collect::<Vec<_>>());
+
                             for i in 1..=value {
-                                let prob = explode_probability(side_values, i as u64, None)?;
-                                let avg =
-                                    avg(&side_values.iter().map(|v| *v as f64).collect::<Vec<_>>());
+                                let prob =
+                                    explode_probability(side_values, i as u64, condition.clone())?;
 
                                 let new_roll = prob * avg;
                                 result.explode(new_roll);
@@ -428,7 +452,9 @@ fn apply_modifiers(
                                 }
 
                                 let new_roll = roller(1, side_values, &[], mode, cli)?;
-                                result.explode(new_roll.iter().map(|r| r.sum()).sum());
+                                result.explode(
+                                    new_roll.iter().map(|r| r.sum(cli.mode.as_ref())).sum(),
+                                );
                             }
                         }
                     }
@@ -464,6 +490,10 @@ fn rel_op_eval(operator: &RelOp, left: &DiceRolls, right: &EvalResult) -> Result
     let left = left.last();
     let right = right.result;
 
+    rel_op_eval_value(operator, left, right)
+}
+
+fn rel_op_eval_value(operator: &RelOp, left: f64, right: f64) -> Result<bool, DynError> {
     Ok(match operator {
         RelOp::Equals => left == right,
         RelOp::NotEquals => left != right,
@@ -482,16 +512,54 @@ fn explode_probability(
     let len = side_values.len();
     let mut will_explode_count = 0;
 
-    let condition = if let Some((operator, ref value)) = condition {
-        Some((operator, value.result))
-    } else {
-        None
-    };
+    let (op, rhs) = condition.map_or_else(
+        || {
+            (
+                &RelOp::Equals,
+                *side_values.iter().max().unwrap_or(&0) as f64,
+            )
+        },
+        |(op, ref result)| (op, result.result),
+    );
 
-    // for v in side_values {
-    //     if
-    // }
+    for v in side_values {
+        dbg!(&op, &v, &rhs);
+        if rel_op_eval_value(op, *v as f64, rhs)? {
+            will_explode_count += 1;
+        }
+    }
 
-    let max = *side_values.iter().max().unwrap() as f64;
-    Ok(1f64 / max.powf(depth as f64))
+    dbg!(&will_explode_count, &len);
+    let prob = will_explode_count as f64 / len as f64;
+
+    Ok(prob.powf(depth as f64))
+}
+
+fn reroll_probability(
+    side_values: &[i64],
+    depth: u64,
+    condition: Option<(&RelOp, EvalResult)>,
+) -> Result<f64, DynError> {
+    let len = side_values.len();
+    let mut will_reroll_count = 0;
+
+    let (op, rhs) = condition.map_or_else(
+        || {
+            (
+                &RelOp::Equals,
+                *side_values.iter().min().unwrap_or(&0) as f64,
+            )
+        },
+        |(op, ref result)| (op, result.result),
+    );
+
+    for v in side_values {
+        if rel_op_eval_value(op, *v as f64, rhs)? {
+            will_reroll_count += 1;
+        }
+    }
+
+    let prob = will_reroll_count as f64 / len as f64;
+
+    Ok(prob.powf(depth as f64))
 }

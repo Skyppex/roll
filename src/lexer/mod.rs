@@ -6,7 +6,7 @@ pub fn tokenize(expression: &str) -> Result<Vec<Token>, DynError> {
 
     while let Some(c) = chars.next() {
         match c {
-            ' ' => {}
+            ' ' | '\t' | '\r' | '\n' | '\0' => {} // ignore whitespace characters
             '(' => tokens.push(Token::OpenParen),
             ')' => tokens.push(Token::CloseParen),
             '[' => tokens.push(Token::OpenBracket),

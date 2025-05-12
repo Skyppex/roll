@@ -1,5 +1,6 @@
 use crate::lexer::Token;
 
+#[derive(Debug)]
 pub struct Cursor {
     tokens: Vec<Token>,
 }
@@ -28,7 +29,7 @@ impl Cursor {
     }
 
     pub fn bump(&mut self) -> Option<Token> {
-        if self.tokens.first().is_some() {
+        if !self.tokens.is_empty() {
             Some(self.tokens.remove(0))
         } else {
             None

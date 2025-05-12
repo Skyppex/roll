@@ -54,6 +54,7 @@ fn run_amount<W: Write + Send + 'static>(writer: W, buf: &str, cli: &Cli) -> Res
         })?;
 
     let result = eval(&tree, cli)?;
+    dbg!(&result);
     let mut writer = writer.lock().unwrap();
     write!(writer, "{}", format_result(result, cli))?;
     Ok(())

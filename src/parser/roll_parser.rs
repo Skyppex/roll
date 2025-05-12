@@ -4,7 +4,10 @@ use super::{cursor::Cursor, parse_expr, parse_primary, Condition, Expr, Modifier
 
 pub fn parse(rolls: Expr, cursor: &mut Cursor) -> Result<Expr, DynError> {
     let sides = parse_sides(cursor)?;
+    dbg!(&cursor);
     let modifiers = parse_modifiers(cursor)?;
+
+    dbg!(&modifiers);
 
     Ok(Expr::Roll {
         rolls: Box::new(rolls),
@@ -87,7 +90,7 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, DynError> {
             (Some(Token::K), _) => {
                 cursor.bump();
 
-                if cursor.first() != Some(Token::H) {
+                if cursor.first() == Some(Token::H) {
                     cursor.bump();
                 }
 
@@ -113,6 +116,10 @@ fn parse_modifiers(cursor: &mut Cursor) -> Result<Vec<Modifier>, DynError> {
             }
             (Some(Token::D), _) => {
                 cursor.bump();
+
+                if cursor.first() == Some(Token::L) {
+                    cursor.bump();
+                }
 
                 let mut amount = Expr::Int(1);
 
