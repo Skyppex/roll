@@ -2,7 +2,7 @@ use std::str::FromStr;
 
 use clap::{ArgGroup, Parser};
 
-/// Write a concise description of the command here.
+/// Roll some dice using the command line.
 #[derive(Debug, Clone, Parser)]
 #[command(version, author, about)]
 #[command(group=ArgGroup::new("log").args(["verbose", "quiet"]).multiple(false))]
