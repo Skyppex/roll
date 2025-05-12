@@ -37,9 +37,37 @@ pub struct Cli {
     #[arg(short, long)]
     pub mode: Option<Mode>,
 
-    /// The expression to evaluate.
-    /// If not provided, read from source or stdin.
-    #[arg(last = true)]
+    /// The expression to evaluate. If not provided, read from source or stdin.
+    /// ‎
+    /// Syntax:
+    /// - `d6` - roll a 6-sided die
+    /// - `d[3..6]` - roll a die with a range of sides (inclusive)
+    /// - `d[3, 5, 7]` - roll a die with a set of sides
+    /// - `df` - roll a fudge die (same as d[-1, 0, 1])
+    /// - `2d8` - roll two 8-sided die
+    /// - `2d6k or 2d6kh` - roll two 6-sided die and keep the highest
+    /// - `2d6kl` - roll two 6-sided die and keep the lowest
+    /// - `2d6d or 2d6dl` - roll two 6-sided die and drop the lowest
+    /// - `2d6dh` - roll two 6-sided die and drop the highest
+    /// - `1d6!` - roll a 6-sided die and explode on 6
+    /// - `1d6r` - roll a 6-sided die and reroll on 1
+    /// ‎
+    /// Conditionals:
+    /// For reroll or explode, you can add a condition.
+    /// After the '!' or 'r', append:
+    /// - `=3` - equals 3
+    /// - `~=3` - not equals 3
+    /// - `>3` - greater than 3
+    /// - `<3` - less than 3
+    /// - `>=3` - greater than or equals 3
+    /// - `<=3` - less than or equals 3
+    /// ‎
+    /// Examples:
+    /// - `1d20 + 5` - roll a 20-sided die and add 5
+    /// - `(1d4)d4` - roll 1d4 number of d4s
+    /// - `4d(1d4)` - roll 4 dice with 1d4 sides
+    /// - `2d6kh!>=5` - roll two 6-sided die, keep highest, then explode on 5 or higher
+    #[arg(last = true, verbatim_doc_comment)]
     pub expression: Vec<String>,
 }
 
