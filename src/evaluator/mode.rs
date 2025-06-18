@@ -379,7 +379,7 @@ fn apply_modifiers(
                                     if !rel_op_eval(operator, result, condition_value)? {
                                         continue;
                                     }
-                                } else if result.sum(cli.mode.as_ref()) > result.min_side() as f64 {
+                                } else if result.last() > result.min_side() as f64 {
                                     continue;
                                 }
 
@@ -475,14 +475,14 @@ fn med(values: &[i64]) -> f64 {
     let mut sorted = values.to_vec();
     sorted.sort();
 
-    let len = values.len();
+    let len = sorted.len();
 
     let mid = len / 2;
 
     if len % 2 == 0 {
-        (values[mid - 1] + values[mid]) as f64 / 2.0
+        (sorted[mid - 1] + sorted[mid]) as f64 / 2.0
     } else {
-        values[len / 2] as f64
+        sorted[len / 2] as f64
     }
 }
 
@@ -523,13 +523,11 @@ fn explode_probability(
     );
 
     for v in side_values {
-        dbg!(&op, &v, &rhs);
         if rel_op_eval_value(op, *v as f64, rhs)? {
             will_explode_count += 1;
         }
     }
 
-    dbg!(&will_explode_count, &len);
     let prob = will_explode_count as f64 / len as f64;
 
     Ok(prob.powf(depth as f64))

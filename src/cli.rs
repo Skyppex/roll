@@ -33,7 +33,7 @@ pub struct Cli {
     #[arg(short, long)]
     pub explain: bool,
 
-    /// The mode to evaluate the expression with.
+    /// The mode to evaluate the expression with. rng (default), avg, min, max, med, simavg:<iteration>.
     #[arg(short, long)]
     pub mode: Option<Mode>,
 

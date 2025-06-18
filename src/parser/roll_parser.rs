@@ -4,10 +4,7 @@ use super::{cursor::Cursor, parse_expr, parse_primary, Condition, Expr, Modifier
 
 pub fn parse(rolls: Expr, cursor: &mut Cursor) -> Result<Expr, DynError> {
     let sides = parse_sides(cursor)?;
-    dbg!(&cursor);
     let modifiers = parse_modifiers(cursor)?;
-
-    dbg!(&modifiers);
 
     Ok(Expr::Roll {
         rolls: Box::new(rolls),
